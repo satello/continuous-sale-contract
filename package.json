@@ -9,5 +9,8 @@
   "private": false,
   "dependencies": {
     "openzeppelin-solidity": "^2.0.0"
+  },
+  "devDependencies": {
+    "truffle": "^5.0.0"
   }
 }
