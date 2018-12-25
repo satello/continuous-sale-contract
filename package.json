@@ -8,7 +8,9 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
-    "openzeppelin-solidity": "^2.0.0"
+    "chai": "^4.2.0",
+    "openzeppelin-solidity": "^2.0.0",
+    "pify": "^4.0.1"
   },
   "devDependencies": {
     "truffle": "^5.0.0"

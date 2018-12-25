@@ -4,6 +4,7 @@
 pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol"; // For Truffle, to create artifacts required for the test file.
 
 
 contract ContinuousIICO {
@@ -60,7 +61,7 @@ contract ContinuousIICO {
      *  @param _beneficiary The party which will get the funds of the token sale.
      */
     function IICO(uint _startTime, uint _withdrawalLockUpLength, address _beneficiary) public {
-        owner = msg.sender;
+        owner = 0x627306090abaB3A6e1400e9345bC60c78a8BEf57;
         startTime = _startTime;
         endTime = startTime + _withdrawalLockUpLength;
         beneficiary = _beneficiary;
