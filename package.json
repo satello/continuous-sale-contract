@@ -10,9 +10,8 @@
   "dependencies": {
     "chai": "^4.2.0",
     "openzeppelin-solidity": "^2.0.0",
-    "pify": "^4.0.1"
+    "pify": "^4.0.1",
+    "truffle": "4.1.15"
   },
-  "devDependencies": {
-    "truffle": "^5.0.0"
-  }
+  "devDependencies": {}
 }

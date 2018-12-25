@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */ // Avoid the linter considering truffle elements as undef.
 const { increase } = require("openzeppelin-solidity/test/helpers/time");
-const { shouldFail } = require("openzeppelin-solidity/test/helpers/shouldFail");
+const shouldFail = require("openzeppelin-solidity/test/helpers/shouldFail");
 const MintableToken = artifacts.require(
   "openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol"
 );
@@ -25,15 +25,21 @@ contract("ContinuousIICO", function(accounts) {
   let noCap = 120000000e18; // for placing bids with no cap
   testAccount = buyerE;
 
-  // Constructor
-  it.only("Should create the contract with the initial values", async () => {
-    let startTestTime = web3.eth.getBlock("latest").timestamp;
-    let iico = await IICO.new(
+  let iico;
+  let startTestTime;
+
+  beforeEach("initialize the contract", async function() {
+    startTestTime = web3.eth.getBlock("latest").timestamp;
+    iico = await IICO.new(
       startTestTime + timeBeforeStart,
       withdrawalLockUpLength,
       beneficiary,
-      { from: "0x627306090abaB3A6e1400e9345bC60c78a8BEf57", gas: 1000000 }
+      { from: "0x627306090abaB3A6e1400e9345bC60c78a8BEf57", gas: 2000000 }
     );
+  });
+
+  // Constructor
+  it.only("Should create the contract with the initial values", async () => {
     let head = await iico.bids(0);
     let tailID = head[1];
     let tail = await iico.bids(tailID);
@@ -55,26 +61,13 @@ contract("ContinuousIICO", function(accounts) {
       startTestTime + 1000,
       "The startTime is not set correctly"
     );
+
     assert.equal(
-      await iico.endFullBonusTime(),
-      startTestTime + 6000,
+      (await iico.endTime()).toNumber(),
+      startTestTime + timeBeforeStart + withdrawalLockUpLength,
       "The endFullBonusTime is not set correctly"
     );
-    assert.equal(
-      await iico.withdrawalLockTime(),
-      startTestTime + 8500,
-      "The endFullBonusTime is not set correctly"
-    );
-    assert.equal(
-      await iico.endTime(),
-      startTestTime + 11000,
-      "The endFullBonusTime is not set correctly"
-    );
-    assert.equal(
-      await iico.maxBonus(),
-      2e8,
-      "The maxBonus is not set correctly"
-    );
+
     assert.equal(
       await iico.finalized(),
       false,
@@ -90,28 +83,13 @@ contract("ContinuousIICO", function(accounts) {
       0,
       "The sumAcceptedContrib is not set correctly"
     );
-    assert.equal(
-      await iico.sumAcceptedVirtualContrib(),
-      0,
-      "The sumAcceptedVirtualContrib is not set correctly"
-    );
   });
 
   // setToken
-  it("Should set the token", async () => {
-    let startTestTime = web3.eth.getBlock("latest").timestamp;
-    let iico = await IICO.new(
-      startTestTime + timeBeforeStart,
-      fullBonusLength,
-      partialWithdrawalLength,
-      withdrawalLockUpLength,
-      maxBonus,
-      beneficiary,
-      { from: owner }
-    );
+  it.only("Should set the token", async () => {
     let token = await MintableToken.new({ from: owner });
     await token.mint(iico.address, 160e24, { from: owner });
-    await expectThrow(iico.setToken(token.address, { from: buyerA })); // Only owner can set.
+    await shouldFail.reverting(iico.setToken(token.address, { from: buyerA })); // Only owner can set.
     await iico.setToken(token.address, { from: owner });
 
     assert.equal(
@@ -127,17 +105,7 @@ contract("ContinuousIICO", function(accounts) {
   });
 
   // submitBid
-  it("Should submit only valid bids", async () => {
-    let startTestTime = web3.eth.getBlock("latest").timestamp;
-    let iico = await IICO.new(
-      startTestTime + timeBeforeStart,
-      fullBonusLength,
-      partialWithdrawalLength,
-      withdrawalLockUpLength,
-      maxBonus,
-      beneficiary,
-      { from: owner }
-    );
+  it.only("Should submit only valid bids", async () => {
     let head = await iico.bids(0);
     let tailID = head[1];
     let tail = await iico.bids(tailID);
@@ -145,25 +113,25 @@ contract("ContinuousIICO", function(accounts) {
     await token.mint(iico.address, 160e24, { from: owner });
     await iico.setToken(token.address, { from: owner });
 
-    await expectThrow(
+    await shouldFail.reverting(
       iico.submitBid(1e18, head[1], { from: buyerA, value: 0.1e18 })
     ); // Should not work before the sale hasn't start yet.
-    increaseTime(1010); // Full bonus period.
+    increase(1010); // Full bonus period.
     await iico.submitBid(1e18, head[1], { from: buyerA, value: 0.1e18 }); // Bid 1.
-    await expectThrow(
+    await shouldFail.reverting(
       iico.submitBid(0.5e18, head[1], { from: buyerB, value: 0.1e18 })
     ); // Should not work because not inserted in the right position.
-    await expectThrow(
+    await shouldFail.reverting(
       iico.submitBid(0.5e18, 0, { from: buyerB, value: 0.1e18 })
     );
     await iico.submitBid(0.5e18, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
 
-    increaseTime(5000); // Partial bonus period.
+    increase(5000); // Partial bonus period.
     await iico.submitBid(0.8e18, 1, { from: buyerC, value: 0.15e18 }); // Bid 3.
-    increaseTime(2500); // Withdrawal lock period.
+    increase(2500); // Withdrawal lock period.
     await iico.submitBid(0.7e18, 3, { from: buyerD, value: 0.15e18 }); // Bid 4.
-    increaseTime(2500); // End of sale period.
-    await expectThrow(
+    increase(2500); // End of sale period.
+    await shouldFail.reverting(
       iico.submitBid(0.9e18, 1, { from: buyerE, value: 0.15e18 })
     );
   });
