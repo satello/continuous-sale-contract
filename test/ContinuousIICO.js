@@ -1,5 +1,6 @@
 /* eslint-disable no-undef */ // Avoid the linter considering truffle elements as undef.
-const { increase } = require("openzeppelin-solidity/test/helpers/time");
+const web3 = require("web3");
+const time = require("openzeppelin-solidity/test/helpers/time");
 const shouldFail = require("openzeppelin-solidity/test/helpers/shouldFail");
 const MintableToken = artifacts.require(
   "openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol"
@@ -7,88 +8,46 @@ const MintableToken = artifacts.require(
 const IICO = artifacts.require("ContinuousIICO");
 
 contract("ContinuousIICO", function(accounts) {
-  let owner = accounts[0];
-  let beneficiary = accounts[1];
-  let buyerA = accounts[2];
-  let buyerB = accounts[3];
-  let buyerC = accounts[4];
-  let buyerD = accounts[5];
-  let buyerE = accounts[6];
-  let buyerF = accounts[7];
-  let gasPrice = 5e9;
+  const owner = accounts[0];
+  const beneficiary = accounts[1];
+  const buyerA = accounts[2];
+  const buyerB = accounts[3];
+  const buyerC = accounts[4];
+  const buyerD = accounts[5];
+  const buyerE = accounts[6];
+  const buyerF = accounts[7];
+  const GAS_PRICE = 5e9;
+  const tokensToMint = new web3.utils.BN("120000000000000000000000000"); // 1.2e26
+  const uint256Max = new web3.utils.BN("2")
+    .pow(new web3.utils.BN("256"))
+    .sub(new web3.utils.BN("1"));
 
-  let timeBeforeStart = 1000;
-  let fullBonusLength = 5000;
-  let partialWithdrawalLength = 2500;
-  let withdrawalLockUpLength = 2500;
-  let maxBonus = 2e8;
-  let noCap = 120000000e18; // for placing bids with no cap
+  const TIME_BEFORE_START = 1000;
+  const withdrawalLockUpLength = 2500;
+  const noCap = 120000000e18; // for placing bids with no cap
   testAccount = buyerE;
 
   let iico;
   let startTestTime;
 
   beforeEach("initialize the contract", async function() {
-    startTestTime = web3.eth.getBlock("latest").timestamp;
-    iico = await IICO.new(
-      startTestTime + timeBeforeStart,
-      withdrawalLockUpLength,
-      beneficiary,
-      { from: "0x627306090abaB3A6e1400e9345bC60c78a8BEf57", gas: 2000000 }
-    );
+    iico = await IICO.new({
+      from: owner
+    });
   });
 
   // Constructor
   it.only("Should create the contract with the initial values", async () => {
-    let head = await iico.bids(0);
-    let tailID = head[1];
-    let tail = await iico.bids(tailID);
-
-    console.log(await iico.owner.call({ from: owner }));
     assert.equal(await iico.owner(), owner, "The owner is not set correctly");
-    assert.equal(
-      await iico.beneficiary(),
-      beneficiary,
-      "The beneficiary is not set correctly"
-    );
-    assert.equal(
-      await iico.lastBidID(),
-      0,
-      "The lastBidID is not set correctly"
-    );
-    assert.equal(
-      await iico.startTime(),
-      startTestTime + 1000,
-      "The startTime is not set correctly"
-    );
-
-    assert.equal(
-      (await iico.endTime()).toNumber(),
-      startTestTime + timeBeforeStart + withdrawalLockUpLength,
-      "The endFullBonusTime is not set correctly"
-    );
-
-    assert.equal(
-      await iico.finalized(),
-      false,
-      "The finalized is not set correctly"
-    );
-    assert.equal(
-      (await iico.cutOffBidID()).toNumber(),
-      head[1].toNumber(),
-      "The cutOffBidID is not set correctly"
-    );
-    assert.equal(
-      await iico.sumAcceptedContrib(),
-      0,
-      "The sumAcceptedContrib is not set correctly"
-    );
   });
 
   // setToken
   it.only("Should set the token", async () => {
     let token = await MintableToken.new({ from: owner });
-    await token.mint(iico.address, 160e24, { from: owner });
+    await shouldFail.reverting(iico.setToken(token.address, { from: owner })); // Can't set the token if contracts balance is zero.
+    await token.mint(iico.address, tokensToMint, {
+      from: owner
+    });
     await shouldFail.reverting(iico.setToken(token.address, { from: buyerA })); // Only owner can set.
     await iico.setToken(token.address, { from: owner });
 
@@ -97,43 +56,61 @@ contract("ContinuousIICO", function(accounts) {
       token.address,
       "The token is not set correctly"
     );
-    assert.equal(
-      await iico.tokensForSale(),
-      160e24,
+
+    assert(
+      (await iico.tokensForSale()).eq(tokensToMint),
       "The tokensForSale is not set correctly"
     );
   });
 
+  it.only("Should start the sale", async () => {
+    let token = await MintableToken.new({ from: owner });
+    await token.mint(iico.address, tokensToMint, {
+      from: owner
+    });
+
+    await shouldFail.reverting(
+      iico.startSale(TIME_BEFORE_START, { from: owner })
+    ); // Token not set yet, should revert.
+
+    await iico.setToken(token.address, { from: owner });
+    await iico.startSale(TIME_BEFORE_START, { from: owner });
+  });
+
   // submitBid
   it.only("Should submit only valid bids", async () => {
-    let head = await iico.bids(0);
-    let tailID = head[1];
+    let headOfFirstDay = await iico.bids(0);
+    let tailID = uint256Max;
+    let tailIDHex = web3.utils.numberToHex(tailID);
     let tail = await iico.bids(tailID);
     let token = await MintableToken.new({ from: owner });
-    await token.mint(iico.address, 160e24, { from: owner });
+    await token.mint(iico.address, tokensToMint, { from: owner });
     await iico.setToken(token.address, { from: owner });
+    await iico.startSale(TIME_BEFORE_START, { from: owner });
+    await iico.startSubSale(0);
 
+    let bid = new web3.utils.BN("1").pow(new web3.utils.BN("18"));
     await shouldFail.reverting(
-      iico.submitBid(1e18, head[1], { from: buyerA, value: 0.1e18 })
+      iico.submitBid(bid, 7, { from: buyerA, value: 0.1e18 })
     ); // Should not work before the sale hasn't start yet.
-    increase(1010); // Full bonus period.
-    await iico.submitBid(1e18, head[1], { from: buyerA, value: 0.1e18 }); // Bid 1.
-    await shouldFail.reverting(
-      iico.submitBid(0.5e18, head[1], { from: buyerB, value: 0.1e18 })
-    ); // Should not work because not inserted in the right position.
-    await shouldFail.reverting(
-      iico.submitBid(0.5e18, 0, { from: buyerB, value: 0.1e18 })
-    );
-    await iico.submitBid(0.5e18, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
-
-    increase(5000); // Partial bonus period.
-    await iico.submitBid(0.8e18, 1, { from: buyerC, value: 0.15e18 }); // Bid 3.
-    increase(2500); // Withdrawal lock period.
-    await iico.submitBid(0.7e18, 3, { from: buyerD, value: 0.15e18 }); // Bid 4.
-    increase(2500); // End of sale period.
-    await shouldFail.reverting(
-      iico.submitBid(0.9e18, 1, { from: buyerE, value: 0.15e18 })
-    );
+    // increase(1010); // Full bonus period.
+    // await iico.submitBid(1e18, head[1], { from: buyerA, value: 0.1e18 }); // Bid 1.
+    // await shouldFail.reverting(
+    //   iico.submitBid(0.5e18, head[1], { from: buyerB, value: 0.1e18 })
+    // ); // Should not work because not inserted in the right position.
+    // await shouldFail.reverting(
+    //   iico.submitBid(0.5e18, 0, { from: buyerB, value: 0.1e18 })
+    // );
+    // await iico.submitBid(0.5e18, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
+    //
+    // increase(5000); // Partial bonus period.
+    // await iico.submitBid(0.8e18, 1, { from: buyerC, value: 0.15e18 }); // Bid 3.
+    // increase(2500); // Withdrawal lock period.
+    // await iico.submitBid(0.7e18, 3, { from: buyerD, value: 0.15e18 }); // Bid 4.
+    // increase(2500); // End of sale period.
+    // await shouldFail.reverting(
+    //   iico.submitBid(0.9e18, 1, { from: buyerE, value: 0.15e18 })
+    // );
   });
 
   // searchAndBid
@@ -188,8 +165,8 @@ contract("ContinuousIICO", function(accounts) {
     await iico.searchAndBid(1e18, 0, { from: buyerA, value: 0.1e18 }); // Bid 1.
     let buyerABalanceBeforeReimbursment = web3.eth.getBalance(buyerA);
     await expectThrow(iico.withdraw(1, { from: buyerB })); // Only the contributor can withdraw.
-    let tx = await iico.withdraw(1, { from: buyerA, gasPrice: gasPrice });
-    let txFee = tx.receipt.gasUsed * gasPrice;
+    let tx = await iico.withdraw(1, { from: buyerA, GAS_PRICE: GAS_PRICE });
+    let txFee = tx.receipt.gasUsed * GAS_PRICE;
     let buyerABalanceAfterReimbursment = web3.eth.getBalance(buyerA);
     assert.equal(
       buyerABalanceBeforeReimbursment
@@ -199,13 +176,13 @@ contract("ContinuousIICO", function(accounts) {
       buyerABalanceAfterReimbursment.toNumber(),
       "The buyer has not been reimbursed completely"
     );
-    await expectThrow(iico.withdraw(1, { from: buyerA, gasPrice: gasPrice }));
+    await expectThrow(iico.withdraw(1, { from: buyerA, GAS_PRICE: GAS_PRICE }));
 
     await iico.searchAndBid(0.8e18, 2, { from: buyerB, value: 0.1e18 }); // Bid 2.
     increaseTime(5490); // Partial bonus period. Around 20% locked.
     let buyerBBalanceBeforeReimbursment = web3.eth.getBalance(buyerB);
-    tx = await iico.withdraw(2, { from: buyerB, gasPrice: gasPrice });
-    txFee = tx.receipt.gasUsed * gasPrice;
+    tx = await iico.withdraw(2, { from: buyerB, GAS_PRICE: GAS_PRICE });
+    txFee = tx.receipt.gasUsed * GAS_PRICE;
     let buyerBBalanceAfterReimbursment = web3.eth.getBalance(buyerB);
     assert(
       buyerBBalanceAfterReimbursment
@@ -215,7 +192,7 @@ contract("ContinuousIICO", function(accounts) {
         (4 * 0.1e18) / 5 / 100,
       "The buyer has not been reimbursed correctly"
     ); // Allow up to 1% error due to time taken outside of increaseTime.
-    await expectThrow(iico.withdraw(2, { from: buyerB, gasPrice: gasPrice })); // You should not be able to withdraw twice.
+    await expectThrow(iico.withdraw(2, { from: buyerB, GAS_PRICE: GAS_PRICE })); // You should not be able to withdraw twice.
 
     await iico.searchAndBid(0.5e18, 2, { from: buyerC, value: 0.15e18 }); // Bid 3.
     increaseTime(2500);
@@ -1480,12 +1457,18 @@ contract("ContinuousIICO", function(accounts) {
     await iico.finalize(1000);
 
     // Redeem and verify we can't redeem more than once.
-    let txA = await iico.sendTransaction({ from: buyerA, gasPrice: gasPrice });
-    let txFeeA = txA.receipt.gasUsed * gasPrice;
+    let txA = await iico.sendTransaction({
+      from: buyerA,
+      GAS_PRICE: GAS_PRICE
+    });
+    let txFeeA = txA.receipt.gasUsed * GAS_PRICE;
     await iico.redeem(2);
     await expectThrow(iico.redeem(2));
-    let txC = await iico.sendTransaction({ from: buyerC, gasPrice: gasPrice });
-    let txFeeC = txC.receipt.gasUsed * gasPrice;
+    let txC = await iico.sendTransaction({
+      from: buyerC,
+      GAS_PRICE: GAS_PRICE
+    });
+    let txFeeC = txC.receipt.gasUsed * GAS_PRICE;
     await iico.redeem(5);
     await expectThrow(iico.redeem(5));
     await iico.redeem(6);
@@ -1619,10 +1602,10 @@ contract("ContinuousIICO", function(accounts) {
     );
 
     await expectThrow(iico.withdraw(3, { from: buyerB })); // Only the contributor can withdraw.
-    let tx = await iico.withdraw(3, { from: buyerC, gasPrice: gasPrice });
+    let tx = await iico.withdraw(3, { from: buyerC, GAS_PRICE: GAS_PRICE });
 
-    await expectThrow(iico.withdraw(3, { from: buyerC, gasPrice: gasPrice })); // cannot withdraw more than once
-    let txFee = tx.receipt.gasUsed * gasPrice;
+    await expectThrow(iico.withdraw(3, { from: buyerC, GAS_PRICE: GAS_PRICE })); // cannot withdraw more than once
+    let txFee = tx.receipt.gasUsed * GAS_PRICE;
     let CarlBalanceAfterReimbursment = web3.eth.getBalance(buyerC);
     assert.closeTo(
       CarlBalanceBeforeReimbursment.plus(1e18)
