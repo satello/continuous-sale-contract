@@ -10,7 +10,7 @@ contract ContinuousIICO {
 
     /* *** General *** */
     address public owner;       // The one setting up the contract.
-    address public beneficiary = 0x801bc7c678E8C9868f9FAE4F7346A8f7e302c1cC; // The address which will get the funds.
+    address public beneficiary; // The address which will get the funds.
 
     /* *** Bid *** */
     uint constant HEAD = 0;            // Minimum value used for both the maxValuation and bidID of the head of the linked list.
@@ -18,7 +18,7 @@ contract ContinuousIICO {
     uint constant INFINITY = uint(-2); // A value so high that a bid using it is guaranteed to succeed. Still lower than TAIL to be placed before TAIL.
     // A bid to buy tokens as long as the personal maximum valuation is not exceeded.
     // Bids are in a sorted doubly linked list.
-    // They are sorted in ascending order by (maxValuation,bidID) where bidID is the ID and key of the bid in the mapping.
+    // They are sorted in ascending order by (maxValuation, expiresAfter).
     // The list contains two artificial bids HEAD and TAIL having respectively the minimum and maximum bidID and maxValuation.
     struct Bid {
         /* *** Linked List Members *** */
@@ -29,10 +29,10 @@ contract ContinuousIICO {
         uint contrib;                           // Contribution in wei.
         address contributor;                    // The contributor who placed the bid.
         bool redeemed;                          // True if the ETH or tokens have been redeemed.
-        uint expiresAfter;                      // Expires after given subsale7
-        uint acceptedAt;                        // Mark as accepted in a particular subSale
+        uint expiresAfter;                      // Expires after given subsale
+        uint acceptedAt;                        // Mark as accepted in a particular subsale
     }
-    uint public globalLastBidID = 0;            // IDs before this value are reserved for head bids.
+    uint public globalLastBidID = 0;            // Global ID counter
     mapping (address => uint[]) public contributorBidIDs; // Map contributor to a list of its bid ID.
     mapping (uint => Bid) public bids;          // Map bidID to bid.
 
@@ -45,16 +45,15 @@ contract ContinuousIICO {
     uint public startTime;                      // When the sale starts.
     uint public endTime;                        // When the sale ends.
     ERC20 public token;                         // The token which is sold.
-    uint public tokensForSale;                  //
+    uint public tokensForSale;                  // Total amount of tokens for sale
 
     /* *** Finalization variables *** */
     uint finalizationTurn = 0;                     // Number of subSale which should be finalized before others.
-    uint[365] public cutOffBidIDs;                 // The first accepted bid. All bids after it are accepted.
-    uint[365] public sumAcceptedContribs;          // The sum of accepted contributions.
+    uint[365] public cutOffBidIDs;                 // Cutoff point for a given subsale
+    uint[365] public sumAcceptedContribs;          // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
     event BidSubmitted(address contributor, uint expiresAfter, uint bidID, uint time);
-    event SubSaleInitialized(uint subSaleNumber);
 
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
@@ -63,8 +62,9 @@ contract ContinuousIICO {
 
     /** @dev Constructor. First contract set up (tokens will also need to be transferred to the contract and then setToken needs to be called to finish the setup).
      */
-    constructor() public {
+    constructor(address _beneficiary) public {
         owner = msg.sender;
+        beneficiary = _beneficiary;
 
         bids[HEAD] = Bid({
             prev: TAIL,
@@ -88,6 +88,10 @@ contract ContinuousIICO {
         });
     }
 
+    function changeBeneficiary(address _beneficiary) public onlyOwner {
+      beneficiary = _beneficiary;
+    }
+
     function startTimeOfSubSale(uint _day) public view returns (uint) {
         return startTime + (_day * durationPerSubSale);
     }
@@ -105,11 +109,11 @@ contract ContinuousIICO {
         tokensPerSubSale = tokensForSale / numberOfSubSales;
     }
 
-    function isBidAccepted(uint _bidID) public returns(bool) {
+    function isBidAccepted(uint _bidID) public view returns(bool) {
         return bids[_bidID].acceptedAt < numberOfSubSales;
     }
 
-    function isBidExpired(uint _bidID) public returns(bool) {
+    function isBidExpired(uint _bidID) public view returns(bool) {
         Bid storage bid = bids[_bidID];
         return !isBidAccepted(_bidID) && bid.expiresAfter < finalizationTurn;
     }
@@ -318,7 +322,7 @@ contract ContinuousIICO {
      *  @param _contributor The contributor whose contribution will be returned.
      *  @return contribution The total contribution of the contributor.
      */
-    function totalContrib(address _contributor, uint _subSaleNumber) public view returns (uint contribution) {
+    function totalContrib(address _contributor) public view returns (uint contribution) {
         for (uint i = 0; i < contributorBidIDs[_contributor].length; ++i)
             contribution += bids[contributorBidIDs[_contributor][i]].contrib;
     }
