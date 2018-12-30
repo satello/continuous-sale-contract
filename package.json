@@ -8,6 +8,7 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
+    "@kleros/kathari": "^0.20.0",
     "any-promise": "^1.3.0",
     "bindings": "^1.3.1",
     "chai": "^4.2.0",
@@ -19,5 +20,16 @@
   },
   "devDependencies": {
     "ganache-cli": "^6.2.5"
+  },
+  "scripts": {
+    "prettify": "kathari prettify",
+    "lint:sol": "kathari lint:sol",
+    "lint:js": "kathari lint:js",
+    "lint": "yarn run lint:sol && yarn run lint:js",
+    "test:ganache": "ganache-cli &",
+    "test:truffle": "truffle test",
+    "test": "run-p test:*",
+    "cz": "kathari cz",
+    "build": "truffle compile --all"
   }
 }

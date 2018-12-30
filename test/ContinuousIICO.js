@@ -86,18 +86,24 @@ contract("ContinuousIICO", function(accounts) {
     let token = await MintableToken.new({ from: owner });
     await token.mint(iico.address, tokensToMint, { from: owner });
     await iico.setToken(token.address, { from: owner });
-    await iico.startSale(TIME_BEFORE_START, { from: owner });
+    await iico.startSale(0, { from: owner });
     await iico.startSubSale(0);
 
-    let bid = new web3.utils.BN("1").pow(new web3.utils.BN("18"));
+    let bid1 = new web3.utils.BN("1").pow(new web3.utils.BN("18"));
+    let bid2 = new web3.utils.BN("5").pow(new web3.utils.BN("17"));
+    let bid3 = new web3.utils.BN("1").pow(new web3.utils.BN("18"));
+
     await shouldFail.reverting(
-      iico.submitBid(bid, 7, { from: buyerA, value: 0.1e18 })
-    ); // Should not work before the sale hasn't start yet.
-    // increase(1010); // Full bonus period.
-    // await iico.submitBid(1e18, head[1], { from: buyerA, value: 0.1e18 }); // Bid 1.
-    // await shouldFail.reverting(
-    //   iico.submitBid(0.5e18, head[1], { from: buyerB, value: 0.1e18 })
-    // ); // Should not work because not inserted in the right position.
+      iico.submitBid(bid1, Math.floor(Math.random() * 1000000000 + 1), {
+        from: buyerA,
+        value: 0.1e18
+      })
+    ); // Should not work because the insertion position is incorrect
+    await iico.submitBid(bid1, tailID, { from: buyerA, value: 0.1e18 }); // Bid 1.
+    assert.equal(await iico.globalLastBidID(), 366);
+    await shouldFail.reverting(
+      iico.submitBid(bid2, tailID, { from: buyerB, value: 0.1e18 })
+    ); // Should not work because not inserted in the right position.
     // await shouldFail.reverting(
     //   iico.submitBid(0.5e18, 0, { from: buyerB, value: 0.1e18 })
     // );
