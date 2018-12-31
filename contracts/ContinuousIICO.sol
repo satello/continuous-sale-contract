@@ -90,13 +90,7 @@ contract ContinuousIICO {
       beneficiary = _beneficiary;
     }
 
-    function startTimeOfSubSale(uint _day) public view returns (uint) {
-        return startTime + (_day * durationPerSubSale);
-    }
 
-    function endTimeOfSubSale(uint _subSaleNumber) public view returns(uint) {
-        return startTimeOfSubSale(_subSaleNumber) + durationPerSubSale;
-    }
 
     function startSale(uint _delay) public onlyOwner {
         require(address(token) != address(0), "Token address is zero.");
@@ -107,14 +101,7 @@ contract ContinuousIICO {
         tokensPerSubSale = tokensForSale / numberOfSubSales;
     }
 
-    function isBidAccepted(uint _bidID) public view returns(bool) {
-        return bids[_bidID].acceptedAt < numberOfSubSales;
-    }
 
-    function isBidExpired(uint _bidID) public view returns(bool) {
-        Bid storage bid = bids[_bidID];
-        return !isBidAccepted(_bidID) && bid.expiresAfter < finalizationTurn;
-    }
 
 
     /** @dev Set the token. Must only be called after the IICO contract receives the tokens to be sold.
@@ -242,6 +229,9 @@ contract ContinuousIICO {
             require(token.transfer(bid.contributor, (tokensPerSubSale * (bid.contrib) / sumAcceptedContribs[bid.acceptedAt])), "Failed to transfer Pinakions.");
         }
         // Else the bid is still valid, either will be accepted or get expired in following subsales.
+        else {
+            revert("This bid is neither accepted nor expired.");
+        }
 
     }
 
@@ -264,6 +254,33 @@ contract ContinuousIICO {
     }
 
     /* *** View Functions *** */
+
+    /** @dev Returns the time when a particular subsale is due.
+     *  @param _subSaleNumber Number of subsale: [0, numberOfSubSales-1]
+     *  @return End time of given subsale.
+     */
+    function endTimeOfSubSale(uint _subSaleNumber) public view returns(uint) {
+        return (_subSaleNumber * durationPerSubSale) + durationPerSubSale;
+    }
+
+    /** @dev Returns if the bid is in accepted state or not. Accepted means bid is processed by finalization,
+     *  and the contribution (fully or partially if cutten off) is eligible to be redeemed with the sale token.
+     *  @param _bidID ID of the bid to be queried.
+     *  @return True if given bid is accepted, false otherwise.
+     */
+    function isBidAccepted(uint _bidID) public view returns(bool) {
+        return bids[_bidID].acceptedAt < numberOfSubSales;
+    }
+
+    /** @dev Returns if the bid is in expired state or not. Expired means bid is NOT processed by finalization,
+     *  and expiration deadline is passed. Contribution is ready to be refunded.
+     *  @param _bidID ID of the bid to be queried.
+     *  @return True if given bid is expired, false otherwise.
+     */
+    function isBidExpired(uint _bidID) public view returns(bool) {
+        Bid storage bid = bids[_bidID];
+        return !isBidAccepted(_bidID) && bid.expiresAfter < finalizationTurn;
+    }
 
     /** @dev Search for the correct insertion spot of a bid.
      *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
