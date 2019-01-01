@@ -260,7 +260,7 @@ contract ContinuousIICO {
      *  @return End time of given subsale.
      */
     function endTimeOfSubSale(uint _subSaleNumber) public view returns(uint) {
-        return (_subSaleNumber * durationPerSubSale) + durationPerSubSale;
+        return startTime + (_subSaleNumber * durationPerSubSale) + durationPerSubSale;
     }
 
     /** @dev Returns if the bid is in accepted state or not. Accepted means bid is processed by finalization,
@@ -284,7 +284,8 @@ contract ContinuousIICO {
 
     /** @dev Search for the correct insertion spot of a bid.
      *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
-     *  @param _maxValuation The maximum valuation given by the contributor. Or INFINITY if no maximum valuation is given.
+     *  @param _maxValuation The maximum valuation given by the contributor. Or INFINITY if no maximum valuation is given. Primary key for sorting.
+     *  @param _expiresAfter Expiration deadline of the bid. Secondary key for sorting.
      *  @param _nextStart The bidID of the next bid from the initial position to start the search from.
      *  @return nextInsert The bidID of the next bid from the position the bid must be inserted at.
      */
@@ -308,6 +309,7 @@ contract ContinuousIICO {
 
             else if (_maxValuation == nextBid.maxValuation) // It should be inserted after. The second value we sort by is bidID. Those are increasing, thus if the next bid is of the same maxValuation, we should insert after it.
             {
+                // If bids have the same max valuation, prioritize the bid with closest expiration deadline.
                 if(_expiresAfter > prevBid.expiresAfter)
                 {
                     next = prev;
@@ -330,7 +332,7 @@ contract ContinuousIICO {
         return next;
     }
 
-    /** @dev Get the total contribution of an address.
+    /** @dev Get the total contribution of an address. Doesn't count expired bids.
      *  This can be used for a KYC threshold.
      *  This function is O(n) where n is the amount of bids made by the contributor.
      *  This means that the contributor can make totalContrib(contributor) revert due to an out of gas error on purpose.
@@ -339,7 +341,9 @@ contract ContinuousIICO {
      */
     function totalContrib(address _contributor) public view returns (uint contribution) {
         for (uint i = 0; i < contributorBidIDs[_contributor].length; ++i)
-            contribution += bids[contributorBidIDs[_contributor][i]].contrib;
+            uint bidID = contributorBidIDs[_contributor][i];
+            if(!isBidExpired(contributorBidIDs[_contributor][i]))
+              contribution += bids[bidID].contrib;
     }
 
 
