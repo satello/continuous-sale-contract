@@ -24,8 +24,9 @@ module.exports = {
       confirmations: 2
     },
     development: {
-      network_id: "*",
-      provider: new Web3.providers.HttpProvider("http://localhost:8545")
+      host: "localhost",
+      port: 8545,
+      network_id: "*"
     }
   }
 };
