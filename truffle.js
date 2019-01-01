@@ -1,3 +1,4 @@
+var Web3 = require("web3");
 var HDWalletProvider = require("truffle-hdwallet-provider");
 var mnemonic =
   "emerge cabbage panel need lens sweet assault benefit broken lunch insect differ";
@@ -23,9 +24,8 @@ module.exports = {
       confirmations: 2
     },
     development: {
-      host: "localhost",
-      port: 8545,
-      network_id: "*"
+      network_id: "*",
+      provider: new Web3.providers.HttpProvider("http://localhost:8545")
     }
   }
 };
