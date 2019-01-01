@@ -35,8 +35,8 @@ contract ContinuousIICO {
     mapping (uint => Bid) public bids;          // Map bidID to bid.
 
     /* *** Sale constants *** */
-    uint public durationPerSubSale = 86400;     // Each sale lasts 86400 seconds (24 hours)
-    uint public numberOfSubSales = 365;         // This will be a year long sale (365 days)
+    uint public durationPerSubSale;     // Each sale lasts 86400 seconds (24 hours)
+    uint public numberOfSubSales;         // This will be a year long sale (365 days)
     uint public tokensPerSubSale;               // Will be initialized when sale gets started.
 
     /* *** Sale parameters *** */
@@ -46,7 +46,7 @@ contract ContinuousIICO {
     uint public tokensForSale;                  // Total amount of tokens for sale
 
     /* *** Finalization variables *** */
-    uint finalizationTurn = 0;                     // Number of subSale which should be finalized before others.
+    uint public finalizationTurn = 0;                     // Number of subSale which should be finalized before others.
     uint[365] public cutOffBidIDs;                 // Cutoff point for a given subsale
     uint[365] public sumAcceptedContribs;          // The sum of accepted contributions for a given subsale.
 
@@ -60,9 +60,11 @@ contract ContinuousIICO {
 
     /** @dev Constructor. First contract set up (tokens will also need to be transferred to the contract and then setToken needs to be called to finish the setup).
      */
-    constructor(address _beneficiary) public {
+    constructor(address _beneficiary, uint _numberOfSubsales, uint _durationPerSubsale) public {
         owner = msg.sender;
         beneficiary = _beneficiary;
+        numberOfSubSales = _numberOfSubsales;
+        durationPerSubSale = _durationPerSubsale;
 
         bids[HEAD] = Bid({
             prev: TAIL,
