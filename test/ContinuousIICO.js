@@ -1,4 +1,5 @@
 /* eslint-disable no-undef */ // Avoid the linter considering truffle elements as undef.
+const pify = require("pify");
 const time = require("openzeppelin-solidity/test/helpers/time");
 const shouldFail = require("openzeppelin-solidity/test/helpers/shouldFail");
 const MintableToken = artifacts.require(
@@ -24,7 +25,7 @@ contract("ContinuousIICO", function(accounts) {
   const TIME_BEFORE_START = 1000;
   const withdrawalLockUpLength = 2500;
   const numberOfSubSales = 365;
-  const durationPerSubSale = 1;
+  const durationPerSubSale = 86400;
   const noCap = 120000000e18; // for placing bids with no cap
   testAccount = buyerE;
 
@@ -33,6 +34,22 @@ contract("ContinuousIICO", function(accounts) {
 
   function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function increase(duration) {
+    if (duration < 0)
+      throw Error(`Cannot increase time by a negative amount (${duration})`);
+
+    await pify(web3.currentProvider.send)({
+      jsonrpc: "2.0",
+      method: "evm_increaseTime",
+      params: [duration]
+    });
+
+    await pify(web3.currentProvider.send)({
+      jsonrpc: "2.0",
+      method: "evm_mine"
+    });
   }
 
   beforeEach("initialize the contract", async function() {
@@ -195,7 +212,7 @@ contract("ContinuousIICO", function(accounts) {
     }); // Bid 5.
 
     console.log(web3.currentProvider);
-    await sleep(1000);
+    await increase(86400);
     await iico.finalize(uint256Max, 0, { from: buyerB });
     assert.equal(await iico.finalizationTurn(), 1);
   });
@@ -246,10 +263,8 @@ contract("ContinuousIICO", function(accounts) {
       value: 0.1e18
     }); // Bid 5.
 
-    await time.increase(1000);
+    await increase(86400);
 
-    console.log(web3.currentProvider);
-    await sleep(1100);
     await iico.finalize(2, 0, { from: buyerB });
     //assert.equal(await iico.finalizationTurn(), 0);
     // await iico.finalize(0, 2, { from: buyerC });
