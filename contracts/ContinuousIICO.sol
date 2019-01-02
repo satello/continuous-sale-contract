@@ -35,8 +35,8 @@ contract ContinuousIICO {
     mapping (uint => Bid) public bids;          // Map bidID to bid.
 
     /* *** Sale constants *** */
-    uint public durationPerSubSale;     // Each sale lasts 86400 seconds (24 hours)
-    uint public numberOfSubSales;         // This will be a year long sale (365 days)
+    uint public durationPerSubSale;             // Each sale lasts 86400 seconds (24 hours)
+    uint public numberOfSubSales;               // This will be a year long sale (365 days)
     uint public tokensPerSubSale;               // Will be initialized when sale gets started.
 
     /* *** Sale parameters *** */
@@ -46,7 +46,7 @@ contract ContinuousIICO {
     uint public tokensForSale;                  // Total amount of tokens for sale
 
     /* *** Finalization variables *** */
-    uint public finalizationTurn = 0;                     // Number of subSale which should be finalized before others.
+    uint public finalizationTurn = 0;               // Number of subSale which should be finalized before others.
     uint[365] public cutOffBidIDs;                 // Cutoff point for a given subsale
     uint[365] public sumAcceptedContribs;          // The sum of accepted contributions for a given subsale.
 
@@ -95,8 +95,6 @@ contract ContinuousIICO {
       beneficiary = _beneficiary;
     }
 
-
-
     function startSale(uint _delay) public onlyOwner {
         require(address(token) != address(0), "Token address is zero.");
         require(tokensForSale != 0, "Zero token balance for sale.");
@@ -105,8 +103,6 @@ contract ContinuousIICO {
         endTime = startTime + (numberOfSubSales * durationPerSubSale);
         tokensPerSubSale = tokensForSale / numberOfSubSales;
     }
-
-
 
 
     /** @dev Set the token. Must only be called after the IICO contract receives the tokens to be sold.
@@ -356,6 +352,5 @@ contract ContinuousIICO {
             if(!isBidExpired(contributorBidIDs[_contributor][i]))
               contribution += bids[bidID].contrib;
     }
-
 
 }
