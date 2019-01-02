@@ -182,6 +182,11 @@ contract ContinuousIICO {
         require(finalizationTurn == _subSaleNumber, "There are previous subsales which are not finalized yet. Please finalize them first.");
 
         // Make local copies of the finalization variables in order to avoid modifying storage in order to save gas.
+
+        if(cutOffBidIDs[_subSaleNumber] == 0) // If it's zero, it's not initalized before. (First call to finalize function)
+        {
+          cutOffBidIDs[_subSaleNumber] = TAIL; // Initialize
+        }
         uint localCutOffBidID = cutOffBidIDs[_subSaleNumber];
         uint localSumAcceptedContrib = sumAcceptedContribs[_subSaleNumber];
 
@@ -346,6 +351,26 @@ contract ContinuousIICO {
             uint bidID = contributorBidIDs[_contributor][i];
             if(!isBidExpired(contributorBidIDs[_contributor][i]))
               contribution += bids[bidID].contrib;
+    }
+
+    /* TODO */
+    function valuationAndCutOff() public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidmaxValuation, uint currentCutOffBidContrib) {
+        currentCutOffBidID = bids[TAIL].prev;
+
+        // Loop over all bids or until cut off bid is found
+        while (currentCutOffBidID != HEAD) {
+            Bid storage bid = bids[currentCutOffBidID];
+            if (bid.contrib + valuation < bid.maxValuation) { // We haven't found the cut-off yet.
+                valuation += bid.contrib;
+                currentCutOffBidID = bid.prev; // Go to the previous bid.
+            } else { // We found the cut-off bid. This bid will be taken partially.
+                currentCutOffBidContrib = bid.maxValuation >= valuation ? bid.maxValuation - valuation : 0; // The amount of the contribution of the cut-off bid that can stay in the sale without spilling over the maxValuation.
+                valuation += currentCutOffBidContrib;
+                break;
+            }
+        }
+
+        currentCutOffBidmaxValuation = bids[currentCutOffBidID].maxValuation;
     }
 
 
