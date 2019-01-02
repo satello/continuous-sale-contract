@@ -53,6 +53,9 @@ contract ContinuousIICO {
     /* *** Events *** */
     event BidSubmitted(address contributor, uint expiresAfter, uint bidID, uint time);
 
+    /* *** Debugging Events *** */
+    event CutOffBidIDInit(uint subsaleNumber);
+
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
 
@@ -186,6 +189,7 @@ contract ContinuousIICO {
         if(cutOffBidIDs[_subSaleNumber] == 0) // If it's zero, it's not initalized before. (First call to finalize function)
         {
           cutOffBidIDs[_subSaleNumber] = TAIL; // Initialize
+          emit CutOffBidIDInit(_subSaleNumber);
         }
         uint localCutOffBidID = cutOffBidIDs[_subSaleNumber];
         uint localSumAcceptedContrib = sumAcceptedContribs[_subSaleNumber];
@@ -351,26 +355,6 @@ contract ContinuousIICO {
             uint bidID = contributorBidIDs[_contributor][i];
             if(!isBidExpired(contributorBidIDs[_contributor][i]))
               contribution += bids[bidID].contrib;
-    }
-
-    /* TODO */
-    function valuationAndCutOff() public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidmaxValuation, uint currentCutOffBidContrib) {
-        currentCutOffBidID = bids[TAIL].prev;
-
-        // Loop over all bids or until cut off bid is found
-        while (currentCutOffBidID != HEAD) {
-            Bid storage bid = bids[currentCutOffBidID];
-            if (bid.contrib + valuation < bid.maxValuation) { // We haven't found the cut-off yet.
-                valuation += bid.contrib;
-                currentCutOffBidID = bid.prev; // Go to the previous bid.
-            } else { // We found the cut-off bid. This bid will be taken partially.
-                currentCutOffBidContrib = bid.maxValuation >= valuation ? bid.maxValuation - valuation : 0; // The amount of the contribution of the cut-off bid that can stay in the sale without spilling over the maxValuation.
-                valuation += currentCutOffBidContrib;
-                break;
-            }
-        }
-
-        currentCutOffBidmaxValuation = bids[currentCutOffBidID].maxValuation;
     }
 
 
