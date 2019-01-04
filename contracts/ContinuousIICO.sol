@@ -286,8 +286,9 @@ contract ContinuousIICO {
         return startTime + (_subSaleNumber * durationPerSubSale) + durationPerSubSale;
     }
 
-    /** @dev Returns if the bid is in accepted state or not. Accepted means bid is processed by finalization,
-     *  and the contribution (fully or partially if cutten off) is eligible to be redeemed with the sale token.
+    /** @dev Returns if the bid is in accepted state or not. Accepted means bid is accepted in one of the previous subsales,
+     *  and the contribution (fully or partially if cutten off) is eligible to be redeemed with the token that is sold by this contract.
+     *  Default value is uint(-1), means not accepted yet.
      *  @param _bidID ID of the bid to be queried.
      *  @return True if given bid is accepted, false otherwise.
      */
