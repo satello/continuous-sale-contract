@@ -57,6 +57,8 @@ contract ContinuousIICO {
 
     /* *** Debugging Events *** */
     event CutOffBidIDInit(uint subsaleNumber);
+    event Redeemed(uint bidID);
+    event Reimbursed(uint bidID);
 
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
@@ -249,10 +251,12 @@ contract ContinuousIICO {
         bid.redeemed = true;
         if(isBidExpired(_bidID)){
             bid.contributor.transfer(bid.contrib);
+            emit Reimbursed(_bidID);
         }
         else if(isBidAccepted(_bidID))
         {
             require(token.transfer(bid.contributor, (tokensPerSubSale * (bid.contrib) / sumAcceptedContribs[bid.acceptedAt])), "Failed to transfer Pinakions.");
+            emit Redeemed(_bidID);
         }
         // Else the bid is still valid, either will be accepted or get expired in following subsales.
         else {
