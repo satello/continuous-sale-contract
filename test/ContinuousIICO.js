@@ -24,7 +24,6 @@ contract("ContinuousIICO", function(accounts) {
   const uint256Max = new BN("2").pow(new BN("256")).sub(new BN("1"));
 
   const TIME_BEFORE_START = 1000;
-  const withdrawalLockUpLength = 2500;
   const numberOfSubSales = 365;
   const durationPerSubSale = 86400;
   const noCap = 120000000e18; // for placing bids with no cap
@@ -163,6 +162,8 @@ contract("ContinuousIICO", function(accounts) {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
+
+    await iico.sendTransaction({ from: buyerF, value: 0.3e18 }); // Bid 6.
   });
 
   // searchAndBid
@@ -282,10 +283,10 @@ contract("ContinuousIICO", function(accounts) {
     await iico.setToken(token.address, { from: owner });
     await iico.startSale(0, { from: owner });
 
-    let Valuation1 = new BN("10").pow(new BN("20"));
-    let Valuation2 = new BN("10").pow(new BN("19"));
-    let Valuation3 = new BN("10").pow(new BN("18"));
-    let ValuationTooLow = new BN("10").pow(new BN("14"));
+    const Valuation1 = new BN("10").pow(new BN("20"));
+    const Valuation2 = new BN("10").pow(new BN("19"));
+    const Valuation3 = new BN("10").pow(new BN("18"));
+    const ValuationTooLow = new BN("10").pow(new BN("14"));
 
     await iico.submitBid(Valuation1, 5, tailID, {
       from: buyerA,
@@ -301,9 +302,11 @@ contract("ContinuousIICO", function(accounts) {
     await iico.searchAndBid(ValuationTooLow, 4, tailID, {
       from: buyerF,
       value: 0.1e18
-    }); // Bid 5.
+    }); // Bid 6.
 
     await increase(86400);
+
+    console.log("last globalLastBidID: " + (await iico.globalLastBidID()));
 
     let buyerABalanceBeforeRedeem = await web3.eth.getBalance(buyerA);
     let buyerBBalanceBeforeRedeem = await web3.eth.getBalance(buyerB);
@@ -320,6 +323,13 @@ contract("ContinuousIICO", function(accounts) {
       await shouldFail.reverting(iico.redeem(i, { from: owner }));
     }
 
+    const gasPrice = 1;
+    const redeemTxUsingFallback = await iico.sendTransaction({
+      from: buyerF,
+      value: 0,
+      gasPrice: gasPrice
+    }); // Redeem using fallback
+
     console.log(await web3.eth.getBalance(buyerA));
     // Verify the proper amounts of ETH are refunded.
     assert.equal(
@@ -330,7 +340,7 @@ contract("ContinuousIICO", function(accounts) {
     assert.equal(
       await web3.eth.getBalance(buyerB),
       buyerBBalanceBeforeRedeem,
-      "The buyer B has not been reimbursed as it should"
+      "The buyer B has been given ETH back while the full bid should have been accepted"
     );
     assert.equal(
       await web3.eth.getBalance(buyerC),
@@ -345,16 +355,24 @@ contract("ContinuousIICO", function(accounts) {
     assert.equal(
       await web3.eth.getBalance(buyerE),
       buyerEBalanceBeforeRedeem,
-      "The buyer E has not been reimbursed as it should"
+      "The buyer E has been given ETH back while the full bid should have been accepted"
     );
+
+    console.log(toBN(await web3.eth.getBalance(buyerF)).toString());
     assert(
       toBN(await web3.eth.getBalance(buyerF)).eq(
-        new BN(buyerFBalanceBeforeRedeem).add(new BN("10").pow(new BN("17")))
+        new BN(buyerFBalanceBeforeRedeem).add(
+          new BN("10")
+            .pow(new BN("17"))
+            .sub(
+              new BN(redeemTxUsingFallback.receipt.gasUsed).mul(
+                new BN(gasPrice)
+              )
+            )
+        )
       ),
       "The buyer F has not been reimbursed as it should"
     );
-
-    console.log(typeof beneficiaryBalanceBeforeRedeem);
 
     const balance = new web3.utils.toBN(await web3.eth.getBalance(beneficiary));
     const difference = new BN("7").mul(new BN("10").pow(new BN("17")));
@@ -402,6 +420,8 @@ contract("ContinuousIICO", function(accounts) {
       "The buyer D has not been given the right amount of tokens"
     );
 
+    console.log(toBN(await token.balanceOf(buyerE)).toString());
+
     assert(
       toBN(await token.balanceOf(buyerE)).eq(
         tokensPerSubSale.div(new BN("7")).mul(new BN("1"))
@@ -411,7 +431,7 @@ contract("ContinuousIICO", function(accounts) {
 
     assert(
       toBN(await token.balanceOf(buyerF)).eq(new BN("0")),
-      "The buyer F has not been given the right amount of tokens"
+      "The buyer F has been given tokens while the bid should not be accepted."
     );
   });
 });
