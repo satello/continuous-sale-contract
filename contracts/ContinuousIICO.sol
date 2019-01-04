@@ -325,7 +325,7 @@ contract ContinuousIICO {
             Bid storage prevBid = bids[prev];
 
             if (_maxValuation < prevBid.maxValuation)
-            {       // It should be inserted before.
+            {   // It should be inserted before.
                 next = prev;
             }
             else if (_maxValuation > nextBid.maxValuation) // It should be inserted after. The second value we sort by is bidID. Those are increasing, thus if the next bid is of the same maxValuation, we should insert after it.
@@ -333,7 +333,7 @@ contract ContinuousIICO {
                 next = nextBid.next;
             }
 
-            else if (_maxValuation == nextBid.maxValuation) // It should be inserted after. The second value we sort by is bidID. Those are increasing, thus if the next bid is of the same maxValuation, we should insert after it.
+            else if (_maxValuation == nextBid.maxValuation) // It should be inserted after. The second value we sort by is expiresAfter.
             {
                 // If bids have the same max valuation, prioritize the bid with closest expiration deadline.
                 if(_expiresAfter > prevBid.expiresAfter)
@@ -372,4 +372,34 @@ contract ContinuousIICO {
               contribution += bids[bidID].contrib;
     }
 
+
+    /** @dev Get the current valuation and cut off bid's details on ongoing subsale.
+     *  This function is O(n), where n is the amount of bids. This could exceed the gas limit, therefore this function should only be used for interface display and not by other contracts.
+     *  @return valuation The current valuation and cut off bid's details.
+     *  @return currentCutOffBidID The current cut-off bid.
+     *  @return currentCutOffBidMaxValuation The max valuation of the current cut-off bid.
+     *  @return currentCutOffBidContrib The contributed amount of current cut-off bid.
+     */
+    function valuationAndCutOff() public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidMaxValuation, uint currentCutOffBidContrib) {
+        currentCutOffBidID = bids[TAIL].prev;
+        uint subSaleNumber = getOngoingSubSaleNumber();
+
+        // Loop over all bids or until cut off bid is found
+        while (currentCutOffBidID != HEAD) {
+            Bid storage bid = bids[currentCutOffBidID];
+            if (bid.expiresAfter < subSaleNumber || bid.acceptedAt < numberOfSubSales){
+                continue;
+            }
+            else if (bid.contrib + valuation < bid.maxValuation) { // We haven't found the cut-off yet.
+                valuation += bid.contrib;
+                currentCutOffBidID = bid.prev; // Go to the previous bid.
+            } else { // We found the cut-off bid. This bid will be taken partially.
+                currentCutOffBidContrib = bid.maxValuation >= valuation ? bid.maxValuation - valuation : 0; // The amount of the contribution of the cut-off bid that can stay in the sale without spilling over the maxValuation.
+                valuation += currentCutOffBidContrib;
+                break;
+            }
+        }
+
+        currentCutOffBidMaxValuation = bids[currentCutOffBidID].maxValuation;
+    }
 }
