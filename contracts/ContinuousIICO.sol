@@ -49,7 +49,7 @@ contract ContinuousIICO {
 
     /* *** Finalization variables *** */
     uint public finalizationTurn = 0;           // Finalization of subsale N requires subsale to be finalized. This counter keeps track of latest finalization.
-    uint[365] public cutOffBidIDs;              // Cutoff point for a given subsale.
+    uint public cutOffBidID = TAIL;                    // Cutoff point for the ongoing subsale.
     uint[365] public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
@@ -129,14 +129,7 @@ contract ContinuousIICO {
         tokensForSale = token.balanceOf(this);
     }
 
-    /*  @dev Returns the number of currently ongoing subsale.
-     *  note that there will be one and only one active(ongoing) sale between the window of startTime and endTime.
-     */
-    function getOngoingSubSaleNumber() public view returns(uint) {
-        require(now >= startTime, "Sale not started yet.");
-        require(now < endTime, "Sale already ended.");
-        return (now - startTime) / durationPerSubSale;
-    }
+
 
     /** @dev Submit a bid. The caller must give the exact position the bid must be inserted into in the list.
      *  In practice, use searchAndBid to avoid the position being incorrect due to a new bid being inserted and changing the position the bid must be inserted at.
@@ -200,14 +193,8 @@ contract ContinuousIICO {
         require(now >= endTimeOfSubSale(_subSaleNumber), "This subsale is not due yet.");
         require(finalizationTurn == _subSaleNumber, "There are previous subsales which are not finalized yet. Please finalize them first.");
 
-        if(cutOffBidIDs[_subSaleNumber] == 0) // If it's zero, it's not initalized before. (First call to finalize function)
-        {
-          cutOffBidIDs[_subSaleNumber] = TAIL; // Initialize cut-off as best possible scenario: All bids accepted.
-          emit CutOffBidIDInit(_subSaleNumber);
-        }
-
         // Make local copies of the finalization variables in order to avoid modifying storage in order to save gas.
-        uint localCutOffBidID = cutOffBidIDs[_subSaleNumber];
+        uint localCutOffBidID = cutOffBidID;
         uint localSumAcceptedContrib = sumAcceptedContribs[_subSaleNumber];
 
         // Search for the cut-off bid while adding the contributions.
@@ -231,11 +218,13 @@ contract ContinuousIICO {
                 bid.acceptedAt = _subSaleNumber;
                 localSumAcceptedContrib += bid.contrib;
                 beneficiary.send(localSumAcceptedContrib); // Use send in order to not block if the beneficiary's fallback reverts.
+
+                cutOffBidID = TAIL; // Reset cutOff point for finalization of the next subsale.
             }
         }
 
         // Update storage.
-        cutOffBidIDs[_subSaleNumber] = localCutOffBidID;
+        cutOffBidID = localCutOffBidID;
         sumAcceptedContribs[_subSaleNumber] = localSumAcceptedContrib;
     }
 
@@ -281,6 +270,15 @@ contract ContinuousIICO {
     }
 
     /* *** View Functions *** */
+
+    /*  @dev Returns the number of currently ongoing subsale.
+     *  note that there will be one and only one active(ongoing) sale between the window of startTime and endTime.
+     */
+    function getOngoingSubSaleNumber() public view returns(uint) {
+        require(now >= startTime, "Sale not started yet.");
+        require(now < endTime, "Sale already ended.");
+        return (now - startTime) / durationPerSubSale;
+    }
 
     /** @dev Returns the time when a particular subsale is due.
      *  @param _subSaleNumber Number of subsale: [0, numberOfSubSales-1]
