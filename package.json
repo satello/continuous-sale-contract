@@ -4,7 +4,7 @@
   "description": "Continuous sale implementation of interactive coin offering",
   "main": "index.js",
   "repository": "https://github.com/kleros/openiico-continuous-contract",
-  "author": "Ferit Tunçer <ferit@cryptolab.net>",
+  "author": "Ferit Tunçer <ferit@kleros.io>",
   "license": "MIT",
   "private": false,
   "dependencies": {
