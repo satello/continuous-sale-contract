@@ -258,7 +258,6 @@ contract ContinuousIICO {
         else {
             revert("This bid is neither accepted nor expired.");
         }
-
     }
 
     /** @dev Fallback. Make a bid if ETH are sent. Redeem all the bids of the contributor otherwise.
@@ -266,17 +265,15 @@ contract ContinuousIICO {
      *  This allows users to bid and get their tokens back using only send operations.
      */
     function () public payable {
-        if (msg.value != 0 && now >= startTime && now < endTime) // Make a bid with an infinite maxValuation to current subsale if some ETH was sent.
-            submitBid(INFINITY, numberOfSubSales-1, TAIL); // Autobid flag doesn't matter as max valuation is astronomic.
-        else if (msg.value == 0)                    // Else, redeem all the non redeemed bids if no ETH was sent.
+        if (msg.value != 0)                                   // Make a bid with an infinite maxValuation and no expiration deadline if some ETH was sent.
+            submitBid(INFINITY, numberOfSubSales-1, TAIL);    // expiresAfter argument doesn't matter actually as maxValuation is astronomic the bid will be accepted anyway.
+        else if (msg.value == 0)                              // Else, redeem all the non redeemed bids if no ETH was sent.
             for (uint i = 0; i < contributorBidIDs[msg.sender].length; ++i)
             {
                 uint bidID = contributorBidIDs[msg.sender][i];
-                if ((isBidAccepted(bidID) || isBidExpired(bidID)) && !bids[bidID].redeemed)
+                if ((isBidAccepted(bidID) || isBidExpired(bidID)) && !bids[bidID].redeemed) // Select eligible bids to avoid a call that will cause a revert.
                     redeem(bidID);
             }
-        else                                                     // Otherwise, no actions are possible.
-            revert("Invalid arguments.");
     }
 
     /* *** View Functions *** */
