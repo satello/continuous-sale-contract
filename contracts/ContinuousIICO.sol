@@ -30,7 +30,7 @@ contract ContinuousIICO {
         address contributor;                    // The contributor who placed the bid.
         bool redeemed;                          // True if the ETH or tokens have been redeemed.
         uint expiresAfter;                      // Expires after given subsale
-        uint acceptedAt;                        // Mark as accepted in a particular subsale
+        uint acceptedAt;                        // Mark as accepted (redeemable) in a particular subsale
     }
     uint public globalLastBidID = 0;                      // Global bid ID counter, incremented when a new bid summitted.
     mapping (address => uint[]) public contributorBidIDs; // Map contributor to a list of its bid ID.
