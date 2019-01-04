@@ -133,15 +133,15 @@ contract("ContinuousIICO", function(accounts) {
     await shouldFail.reverting(
       iico.submitBid(
         Valuation1,
-        Math.floor(Math.random() * 1000000000 + 1),
         5,
+        Math.floor(Math.random() * 1000000000 + 1),
         {
           from: buyerA,
           value: 0.1e18
         }
       )
     ); // Should not work because the insertion position is incorrect
-    await iico.submitBid(Valuation1, tailID, 5, {
+    await iico.submitBid(Valuation1, 5, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
@@ -149,17 +149,17 @@ contract("ContinuousIICO", function(accounts) {
     const s = await iico.search(Valuation2, 6, 0);
     console.log(s);
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, tailID, 6, { from: buyerB, value: 0.1e18 })
+      iico.submitBid(Valuation2, 6, tailID, { from: buyerB, value: 0.1e18 })
     ); // Should not work because not inserted in the right position.
 
-    await iico.submitBid(Valuation2, 1, 6, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 2, 6, { from: buyerC, value: 0.15e18 }); // Bid 3.
+    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
+    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.15e18 }); // Bid 3.
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 2, 3, { from: buyerB, value: 0.25e18 })
+      iico.submitBid(Valuation2, 3, 2, { from: buyerB, value: 0.25e18 })
     ); // Should not work because not inserted in the right position.
-    await iico.submitBid(Valuation2, 1, 3, { from: buyerB, value: 0.25e18 }); // Bid 4
+    await iico.submitBid(Valuation2, 3, 1, { from: buyerB, value: 0.25e18 }); // Bid 4
 
-    await iico.searchAndBid(Valuation2, tailID, 4, {
+    await iico.searchAndBid(Valuation2, 4, tailID, {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
@@ -181,15 +181,15 @@ contract("ContinuousIICO", function(accounts) {
     await shouldFail.reverting(
       iico.submitBid(
         Valuation1,
-        Math.floor(Math.random() * 1000000000 + 1),
         5,
+        Math.floor(Math.random() * 1000000000 + 1),
         {
           from: buyerA,
           value: 0.1e18
         }
       )
     ); // Should not work because the insertion position is incorrect
-    await iico.submitBid(Valuation1, tailID, 5, {
+    await iico.submitBid(Valuation1, 5, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
@@ -197,17 +197,17 @@ contract("ContinuousIICO", function(accounts) {
     const s = await iico.search(Valuation2, 6, 0);
     console.log(s);
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, tailID, 6, { from: buyerB, value: 0.1e18 })
+      iico.submitBid(Valuation2, 5, tailID, { from: buyerB, value: 0.1e18 })
     ); // Should not work because not inserted in the right position.
 
-    await iico.submitBid(Valuation2, 1, 6, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 2, 6, { from: buyerC, value: 0.15e18 }); // Bid 3.
+    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
+    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.15e18 }); // Bid 3.
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 2, 3, { from: buyerB, value: 0.25e18 })
+      iico.submitBid(Valuation2, 3, 2, { from: buyerB, value: 0.25e18 })
     ); // Should not work because not inserted in the right position.
-    await iico.submitBid(Valuation2, 1, 3, { from: buyerB, value: 0.25e18 }); // Bid 4
+    await iico.submitBid(Valuation2, 3, 1, { from: buyerB, value: 0.25e18 }); // Bid 4
 
-    await iico.searchAndBid(Valuation2, tailID, 4, {
+    await iico.searchAndBid(Valuation2, 4, tailID, {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
@@ -233,15 +233,15 @@ contract("ContinuousIICO", function(accounts) {
     await shouldFail.reverting(
       iico.submitBid(
         Valuation1,
-        Math.floor(Math.random() * 1000000000 + 1),
         5,
+        Math.floor(Math.random() * 1000000000 + 1),
         {
           from: buyerA,
           value: 0.1e18
         }
       )
     ); // Should not work because the insertion position is incorrect
-    await iico.submitBid(Valuation1, tailID, 5, {
+    await iico.submitBid(Valuation1, 5, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
@@ -249,17 +249,17 @@ contract("ContinuousIICO", function(accounts) {
     const s = await iico.search(Valuation2, 6, 0);
     console.log(s);
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, tailID, 6, { from: buyerB, value: 0.1e18 })
+      iico.submitBid(Valuation2, 6, tailID, { from: buyerB, value: 0.1e18 })
     ); // Should not work because not inserted in the right position.
 
-    await iico.submitBid(Valuation2, 1, 6, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 2, 6, { from: buyerC, value: 0.15e18 }); // Bid 3.
+    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
+    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.15e18 }); // Bid 3.
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 2, 3, { from: buyerB, value: 0.25e18 })
+      iico.submitBid(Valuation2, 3, 2, { from: buyerB, value: 0.25e18 })
     ); // Should not work because not inserted in the right position.
-    await iico.submitBid(Valuation2, 1, 3, { from: buyerB, value: 0.25e18 }); // Bid 4
+    await iico.submitBid(Valuation2, 3, 1, { from: buyerB, value: 0.25e18 }); // Bid 4
 
-    await iico.searchAndBid(Valuation2, tailID, 4, {
+    await iico.searchAndBid(Valuation2, 4, tailID, {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
@@ -287,18 +287,18 @@ contract("ContinuousIICO", function(accounts) {
     let Valuation3 = new BN("10").pow(new BN("18"));
     let ValuationTooLow = new BN("10").pow(new BN("14"));
 
-    await iico.submitBid(Valuation1, tailID, 5, {
+    await iico.submitBid(Valuation1, 5, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
-    await iico.submitBid(Valuation2, 1, 6, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 2, 6, { from: buyerC, value: 0.2e18 }); // Bid 3.
-    await iico.submitBid(Valuation2, 1, 3, { from: buyerD, value: 0.2e18 }); // Bid 4
-    await iico.searchAndBid(Valuation2, tailID, 4, {
+    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
+    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.2e18 }); // Bid 3.
+    await iico.submitBid(Valuation2, 3, 1, { from: buyerD, value: 0.2e18 }); // Bid 4
+    await iico.searchAndBid(Valuation2, 4, tailID, {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
-    await iico.searchAndBid(ValuationTooLow, tailID, 4, {
+    await iico.searchAndBid(ValuationTooLow, 4, tailID, {
       from: buyerF,
       value: 0.1e18
     }); // Bid 5.
