@@ -11,6 +11,12 @@ module.exports = {
       version: "^0.4.25"
     }
   },
+  mocha: {
+    reporter: "eth-gas-reporter",
+    reporterOptions: {
+      currency: "USD"
+    }
+  },
 
   networks: {
     kovan: {
