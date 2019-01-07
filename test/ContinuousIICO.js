@@ -429,9 +429,6 @@ contract("ContinuousIICO", function(accounts) {
 
     const tokensPerSubsale = tokensToMint.div(new BN(numberOfSubsales));
 
-    console.log(tokensPerSubsale.toString());
-    console.log((await token.balanceOf(buyerA)).toString());
-    console.log(tokensPerSubsale.div(new BN("7")).toString());
     assert(
       toBN(await token.balanceOf(buyerA)).eq(tokensPerSubsale.div(new BN("7"))),
       "The buyer A has not been given the right amount of tokens"
@@ -517,8 +514,6 @@ contract("ContinuousIICO", function(accounts) {
       currentCutOffBidContrib
     } = await iico.valuationAndCutOff();
 
-    console.log(valuation.toString());
-
     assert(valuation.eq(new BN("10").pow(new BN("17")).mul(new BN("5"))));
     assert.equal(currentCutOffBidID, 6);
     assert(
@@ -533,7 +528,7 @@ contract("ContinuousIICO", function(accounts) {
     );
   });
 
-  it("Should correctly finalize a multiple subsale case", async function() {
+  it("Should correctly finalize a multiple subsale case and show total conribution correctly", async function() {
     let head = await iico.bids(0);
     let tailID = uint256Max;
     let token = await MintableToken.new({ from: owner });
@@ -635,9 +630,19 @@ contract("ContinuousIICO", function(accounts) {
     await iico.finalize(uint256Max, 2); // Finalize day 1.
     await shouldFail.reverting(iico.finalize(uint256Max, 1));
 
-    for (let i = 0; i < 18; i++) {
-      console.log(await iico.bids(i));
-    }
-    console.log(await iico.finalizationTurn());
+    assert(
+      (await iico.totalContrib(buyerE)).eq(
+        new BN("10").pow(new BN("17")).mul(new BN("3"))
+      )
+    );
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerE,
+      value: 0.2e18
+    });
+    assert(
+      (await iico.totalContrib(buyerE)).eq(
+        new BN("10").pow(new BN("17")).mul(new BN("5"))
+      )
+    );
   });
 });

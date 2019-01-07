@@ -49,33 +49,11 @@ contract ContinuousIICO {
 
     /* *** Finalization variables *** */
     uint public finalizationTurn = 0;           // Finalization of subsale N requires subsale to be finalized. This counter keeps track of latest finalization.
-    uint[365] public cutOffBidIDs;                    // Cutoff point for the ongoing subsale.
+    uint[365] public cutOffBidIDs;              // Cutoff points for subsales.
     uint[365] public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
     event BidSubmitted(uint subsaleNumber, address contributor, uint bidID, uint maxValuation, uint time, uint prev, uint next);
-
-    // TO BE REMOVED - HAS NO EFFECT TO CONTRACT LOGIC - ONLY FOR DEBUGGING PURPOSES
-    /* *** Debugging Events *** */
-    event CutOffBidIDInit(uint subsaleNumber);
-    event Redeemed(uint bidID);
-    event Reimbursed(uint bidID);
-    event PointerUpdated(uint bidID, string pointer, uint newTarget);
-    event Accepted(uint bidID, uint raisedSoFar);
-    event CutOffFound(uint bidID, uint raisedSoFar);
-    event Removing(uint bidID);
-    event Here(uint flag);
-    event Finalizing(uint subSaleNumber);
-    event Print(uint pointer);
-
-    /* Debugging Functions */
-    function printLinkedList() public view {
-        uint pointer = TAIL;
-        while (pointer != HEAD){
-            pointer = bids[pointer].prev;
-            emit Print(pointer);
-        }
-    }
 
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
@@ -159,9 +137,7 @@ contract ContinuousIICO {
         ++globalLastBidID; // Increment the globalLastBidID. It will be the new bid's ID.
         // Update the pointers of neighboring bids.
         prevBid.next = globalLastBidID;
-        emit PointerUpdated(prev, "next", globalLastBidID);
         nextBid.prev = globalLastBidID;
-        emit PointerUpdated(_next, "prev", globalLastBidID);
 
         // Insert the bid.
         bids[globalLastBidID] = Bid({
@@ -213,11 +189,12 @@ contract ContinuousIICO {
         searchAndBid(getOngoingSubsaleNumber(), _maxValuation, search(_maxValuation, _next));
     }
 
-
     /** @dev Finalize by finding the cut-off bid.
      *  Since the amount of bids is not bounded, this function may have to be called multiple times.
      *  The function is O(min(n,_maxIt)) where n is the amount of bids. In total it will perform O(n) computations, possibly in multiple calls.
-     *  Each call only has a O(1) storage write operations.
+     *  Each call has only a constant amount of storage write operations.
+     *  The main loop removes inactive bids on stumbling upon. This avoids future finalizations to iterate over.
+     *  Note that not every inactive bid will be removed in this process, only if they are stumbled upon.
      *  @param _maxIt The maximum amount of bids to go through. This value must be set in order to not exceed the gas limit.
      *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
      */
@@ -225,9 +202,6 @@ contract ContinuousIICO {
         require(now >= endTimeOfSubsale(_subsaleNumber), "This subsale is not due yet.");
         require(finalizationTurn == _subsaleNumber, "You can not finalize this subsale.");
 
-        printLinkedList();
-
-        emit Finalizing(_subsaleNumber);
         if(cutOffBidIDs[_subsaleNumber] == 0)
             cutOffBidIDs[_subsaleNumber] = TAIL;
 
@@ -238,13 +212,10 @@ contract ContinuousIICO {
         // Search for the cut-off bid while adding the contributions.
         for (uint it = 0; it < _maxIt && (finalizationTurn == _subsaleNumber); ++it) {
             Bid storage bid = bids[localCutOffBidID];
-            // Loops stops after finding cutOff, so cleanup is half done.
-            if( bid.subsaleNumber != _subsaleNumber && localCutOffBidID != TAIL){
+
+            if( bid.subsaleNumber != _subsaleNumber && localCutOffBidID != TAIL){ // If stumble upon an inactive bid, clear to avoid iterating it in future finalizations.
                 if(bid.subsaleNumber < _subsaleNumber)
                 {
-                    emit Removing(localCutOffBidID);
-                    emit PointerUpdated(bid.prev, "next", bid.next);
-                    emit PointerUpdated(bid.next, "prev", bid.prev);
                     bids[bid.prev].next = bid.next; // Removes nodes from the linked list by bypassing them.
                     bids[bid.next].prev = bid.prev; // A->B ; B->C; becomes A->C
                 }
@@ -252,7 +223,6 @@ contract ContinuousIICO {
             }
             else if (bid.contrib+localSumAcceptedContrib < bid.maxValuation) { // We haven't found the cut-off yet.
                 localSumAcceptedContrib += bid.contrib;
-                emit Accepted(localCutOffBidID, localSumAcceptedContrib / 1 finney);
                 localCutOffBidID = bid.prev; // Go to the previous bid.
 
             } else { // We found the cut-off. This bid will be taken partially.
@@ -264,7 +234,6 @@ contract ContinuousIICO {
                 bid.subsaleNumber = _subsaleNumber;
                 localSumAcceptedContrib += bid.contrib;
                 beneficiary.send(localSumAcceptedContrib); // Use send in order to not block if the beneficiary's fallback reverts.
-                emit CutOffFound(localCutOffBidID, localSumAcceptedContrib / 1 finney);
             }
         }
 
@@ -337,7 +306,8 @@ contract ContinuousIICO {
 
     /** @dev Search for the correct insertion spot of a bid.
      *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
-     *  @param _maxValuation The maximum valuation given by the contributor. Or INFINITY if no maximum valuation is given. Primary key for sorting.
+     *  Max valuation decreases from tail to head node.
+     *  @param _maxValuation The maximum valuation given by the contributor. Or INFINITY if no maximum valuation is given.
      *  @param _nextStart The bidID of the next bid from the initial position to start the search from.
      *  @return nextInsert The bidID of the next bid from the position the bid must be inserted at.
      */
@@ -374,7 +344,6 @@ contract ContinuousIICO {
             Bid storage bid = bids[bidID];
             uint cutOffBidID = cutOffBidIDs[bid.subsaleNumber];
             Bid storage cutOffBid = bids[cutOffBidID];
-
             if(isBidFinalized(bidID)){ // The bid is finalized.
                 if(bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && bidID >= cutOffBidID)){ // Bid accepted.
                     contribution += bid.contrib;
@@ -385,7 +354,6 @@ contract ContinuousIICO {
             }
         }
     }
-
 
     /** @dev Get the current valuation and cut off bid's details on ongoing subsale.
      *  This function is O(n), where n is the amount of bids. This could exceed the gas limit, therefore this function should only be used for interface display and not by other contracts.
@@ -402,15 +370,12 @@ contract ContinuousIICO {
         while (currentCutOffBidID != HEAD) {
             Bid storage bid = bids[currentCutOffBidID];
             if ( bid.subsaleNumber != subSaleNumber){
-                emit Here(subSaleNumber);
                 currentCutOffBidID = bid.prev;
             }
             else if (bid.contrib + valuation < bid.maxValuation) { // We haven't found the cut-off yet.
-
                 valuation += bid.contrib;
                 currentCutOffBidID = bid.prev; // Go to the previous bid.
             } else { // We found the cut-off bid. This bid will be taken partially.
-
                 currentCutOffBidContrib = bid.maxValuation >= valuation ? bid.maxValuation - valuation : 0; // The amount of the contribution of the cut-off bid that can stay in the sale without spilling over the maxValuation.
                 valuation += currentCutOffBidContrib;
                 break;
