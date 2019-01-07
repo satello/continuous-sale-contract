@@ -24,8 +24,8 @@ contract("ContinuousIICO", function(accounts) {
   const uint256Max = new BN("2").pow(new BN("256")).sub(new BN("1"));
 
   const TIME_BEFORE_START = 1000;
-  const numberOfSubSales = 365;
-  const durationPerSubSale = 86400;
+  const numberOfSubsales = 365;
+  const durationPerSubsale = 86400;
   const noCap = 120000000e18; // for placing bids with no cap
   testAccount = buyerE;
 
@@ -53,7 +53,7 @@ contract("ContinuousIICO", function(accounts) {
   }
 
   beforeEach("initialize the contract", async function() {
-    iico = await IICO.new(beneficiary, numberOfSubSales, durationPerSubSale, {
+    iico = await IICO.new(beneficiary, numberOfSubsales, durationPerSubsale, {
       from: owner
     });
   });
@@ -68,14 +68,14 @@ contract("ContinuousIICO", function(accounts) {
     );
 
     assert.equal(
-      await iico.numberOfSubSales(),
-      numberOfSubSales,
+      await iico.numberOfSubsales(),
+      numberOfSubsales,
       "Number of subsales is not set correctly."
     );
 
     assert.equal(
-      await iico.durationPerSubSale(),
-      durationPerSubSale,
+      await iico.durationPerSubsale(),
+      durationPerSubsale,
       "Duration per subsale is not set correctly."
     );
   });
@@ -116,7 +116,7 @@ contract("ContinuousIICO", function(accounts) {
     await iico.startSale(TIME_BEFORE_START, { from: owner });
   });
 
-  // submitBid
+  // submitBidToOngoingSubsale
   it("Should submit only valid bids", async () => {
     let head = await iico.bids(0);
     let tailID = uint256Max;
@@ -130,9 +130,8 @@ contract("ContinuousIICO", function(accounts) {
     let Valuation3 = new BN("10").pow(new BN("16"));
 
     await shouldFail.reverting(
-      iico.submitBid(
+      iico.submitBidToOngoingSubsale(
         Valuation1,
-        5,
         Math.floor(Math.random() * 1000000000 + 1),
         {
           from: buyerA,
@@ -140,25 +139,39 @@ contract("ContinuousIICO", function(accounts) {
         }
       )
     ); // Should not work because the insertion position is incorrect
-    await iico.submitBid(Valuation1, 5, tailID, {
+    await iico.submitBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
     assert.equal(await iico.globalLastBidID(), 1);
-    const s = await iico.search(Valuation2, 6, 0);
-    console.log(s);
+    const s = await iico.search(Valuation2, 0);
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 6, tailID, { from: buyerB, value: 0.1e18 })
+      iico.submitBidToOngoingSubsale(Valuation2, tailID, {
+        from: buyerB,
+        value: 0.1e18
+      })
     ); // Should not work because not inserted in the right position.
 
-    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.15e18 }); // Bid 3.
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerB,
+      value: 0.1e18
+    }); // Bid 2.
+    await iico.submitBidToOngoingSubsale(Valuation3, 2, {
+      from: buyerC,
+      value: 0.15e18
+    }); // Bid 3.
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 3, 2, { from: buyerB, value: 0.25e18 })
+      iico.submitBidToOngoingSubsale(Valuation2, 2, {
+        from: buyerB,
+        value: 0.25e18
+      })
     ); // Should not work because not inserted in the right position.
-    await iico.submitBid(Valuation2, 3, 1, { from: buyerB, value: 0.25e18 }); // Bid 4
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerB,
+      value: 0.25e18
+    }); // Bid 4
 
-    await iico.searchAndBid(Valuation2, 4, tailID, {
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
@@ -166,7 +179,7 @@ contract("ContinuousIICO", function(accounts) {
     await iico.sendTransaction({ from: buyerF, value: 0.3e18 }); // Bid 6.
   });
 
-  // searchAndBid
+  // searchAndBidToOngoingSubsale
   it("Should finalize in single run", async () => {
     let head = await iico.bids(0);
     let tailID = uint256Max;
@@ -180,9 +193,8 @@ contract("ContinuousIICO", function(accounts) {
     let Valuation3 = new BN("10").pow(new BN("16"));
 
     await shouldFail.reverting(
-      iico.submitBid(
+      iico.submitBidToOngoingSubsale(
         Valuation1,
-        5,
         Math.floor(Math.random() * 1000000000 + 1),
         {
           from: buyerA,
@@ -190,30 +202,43 @@ contract("ContinuousIICO", function(accounts) {
         }
       )
     ); // Should not work because the insertion position is incorrect
-    await iico.submitBid(Valuation1, 5, tailID, {
+    await iico.submitBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
     assert.equal(await iico.globalLastBidID(), 1);
-    const s = await iico.search(Valuation2, 6, 0);
-    console.log(s);
+    const s = await iico.search(Valuation2, 0);
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 5, tailID, { from: buyerB, value: 0.1e18 })
+      iico.submitBidToOngoingSubsale(Valuation2, tailID, {
+        from: buyerB,
+        value: 0.1e17
+      })
     ); // Should not work because not inserted in the right position.
 
-    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.15e18 }); // Bid 3.
-    await shouldFail.reverting(
-      iico.submitBid(Valuation2, 3, 2, { from: buyerB, value: 0.25e18 })
-    ); // Should not work because not inserted in the right position.
-    await iico.submitBid(Valuation2, 3, 1, { from: buyerB, value: 0.25e18 }); // Bid 4
-
-    await iico.searchAndBid(Valuation2, 4, tailID, {
-      from: buyerE,
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerB,
       value: 0.1e18
+    }); // Bid 2.
+    await iico.submitBidToOngoingSubsale(Valuation3, 2, {
+      from: buyerC,
+      value: 0.15e18
+    }); // Bid 3.
+    await shouldFail.reverting(
+      iico.submitBidToOngoingSubsale(Valuation2, 2, {
+        from: buyerB,
+        value: 0.25e18
+      })
+    ); // Should not work because not inserted in the right position.
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerB,
+      value: 0.25e18
+    }); // Bid 4
+
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerE,
+      value: 0.1e17
     }); // Bid 5.
 
-    console.log(web3.currentProvider);
     await increase(86400);
     await iico.finalize(uint256Max, 0, { from: buyerB });
     assert.equal(await iico.finalizationTurn(), 1);
@@ -232,9 +257,8 @@ contract("ContinuousIICO", function(accounts) {
     let Valuation3 = new BN("10").pow(new BN("18"));
 
     await shouldFail.reverting(
-      iico.submitBid(
+      iico.submitBidToOngoingSubsale(
         Valuation1,
-        5,
         Math.floor(Math.random() * 1000000000 + 1),
         {
           from: buyerA,
@@ -242,25 +266,39 @@ contract("ContinuousIICO", function(accounts) {
         }
       )
     ); // Should not work because the insertion position is incorrect
-    await iico.submitBid(Valuation1, 5, tailID, {
+    await iico.submitBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
     assert.equal(await iico.globalLastBidID(), 1);
-    const s = await iico.search(Valuation2, 6, 0);
-    console.log(s);
+    const s = await iico.search(Valuation2, 0);
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 6, tailID, { from: buyerB, value: 0.1e18 })
+      iico.submitBidToOngoingSubsale(Valuation2, tailID, {
+        from: buyerB,
+        value: 0.1e18
+      })
     ); // Should not work because not inserted in the right position.
 
-    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.15e18 }); // Bid 3.
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerB,
+      value: 0.1e18
+    }); // Bid 2.
+    await iico.submitBidToOngoingSubsale(Valuation3, 2, {
+      from: buyerC,
+      value: 0.15e18
+    }); // Bid 3.
     await shouldFail.reverting(
-      iico.submitBid(Valuation2, 3, 2, { from: buyerB, value: 0.25e18 })
+      iico.submitBidToOngoingSubsale(Valuation2, 2, {
+        from: buyerB,
+        value: 0.25e18
+      })
     ); // Should not work because not inserted in the right position.
-    await iico.submitBid(Valuation2, 3, 1, { from: buyerB, value: 0.25e18 }); // Bid 4
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerB,
+      value: 0.25e18
+    }); // Bid 4
 
-    await iico.searchAndBid(Valuation2, 4, tailID, {
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
@@ -271,7 +309,7 @@ contract("ContinuousIICO", function(accounts) {
     assert.equal(await iico.finalizationTurn(), 0);
     await iico.finalize(2, 0, { from: buyerC });
     assert.equal(await iico.finalizationTurn(), 0);
-    await iico.finalize(3, 0, { from: buyerA });
+    await iico.finalize(30, 0, { from: buyerA });
     assert.equal(await iico.finalizationTurn(), 1);
   });
 
@@ -288,25 +326,32 @@ contract("ContinuousIICO", function(accounts) {
     const Valuation3 = new BN("10").pow(new BN("18"));
     const ValuationTooLow = new BN("10").pow(new BN("14"));
 
-    await iico.submitBid(Valuation1, 5, tailID, {
+    await iico.submitBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
       value: 0.1e18
     }); // Bid 1.
-    await iico.submitBid(Valuation2, 6, 1, { from: buyerB, value: 0.1e18 }); // Bid 2.
-    await iico.submitBid(Valuation3, 6, 2, { from: buyerC, value: 0.2e18 }); // Bid 3.
-    await iico.submitBid(Valuation2, 3, 1, { from: buyerD, value: 0.2e18 }); // Bid 4
-    await iico.searchAndBid(Valuation2, 4, tailID, {
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerB,
+      value: 0.1e18
+    }); // Bid 2.
+    await iico.submitBidToOngoingSubsale(Valuation3, 2, {
+      from: buyerC,
+      value: 0.2e18
+    }); // Bid 3.
+    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+      from: buyerD,
+      value: 0.2e18
+    }); // Bid 4
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
       from: buyerE,
       value: 0.1e18
     }); // Bid 5.
-    await iico.searchAndBid(ValuationTooLow, 4, tailID, {
+    await iico.searchAndBidToOngoingSubsale(ValuationTooLow, tailID, {
       from: buyerF,
       value: 0.1e18
     }); // Bid 6.
 
     await increase(86400);
-
-    console.log("last globalLastBidID: " + (await iico.globalLastBidID()));
 
     let buyerABalanceBeforeRedeem = await web3.eth.getBalance(buyerA);
     let buyerBBalanceBeforeRedeem = await web3.eth.getBalance(buyerB);
@@ -330,7 +375,6 @@ contract("ContinuousIICO", function(accounts) {
       gasPrice: gasPrice
     }); // Redeem using fallback
 
-    console.log(await web3.eth.getBalance(buyerA));
     // Verify the proper amounts of ETH are refunded.
     assert.equal(
       await web3.eth.getBalance(buyerA),
@@ -358,7 +402,6 @@ contract("ContinuousIICO", function(accounts) {
       "The buyer E has been given ETH back while the full bid should have been accepted"
     );
 
-    console.log(toBN(await web3.eth.getBalance(buyerF)).toString());
     assert(
       toBN(await web3.eth.getBalance(buyerF)).eq(
         new BN(buyerFBalanceBeforeRedeem).add(
@@ -384,47 +427,40 @@ contract("ContinuousIICO", function(accounts) {
       "The beneficiary has not been paid correctly"
     );
 
-    const tokensPerSubSale = tokensToMint.div(new BN(numberOfSubSales));
+    const tokensPerSubsale = tokensToMint.div(new BN(numberOfSubsales));
 
+    console.log(tokensPerSubsale.toString());
+    console.log((await token.balanceOf(buyerA)).toString());
+    console.log(tokensPerSubsale.div(new BN("7")).toString());
     assert(
-      toBN(await token.balanceOf(buyerA)).eq(tokensPerSubSale.div(new BN("7"))),
+      toBN(await token.balanceOf(buyerA)).eq(tokensPerSubsale.div(new BN("7"))),
       "The buyer A has not been given the right amount of tokens"
-    );
-
-    console.log(toBN(await token.balanceOf(buyerB)).toString());
-    console.log(
-      tokensPerSubSale
-        .div(new BN("7"))
-        .mul(new BN("1"))
-        .toString()
     );
 
     assert(
       toBN(await token.balanceOf(buyerB)).eq(
-        tokensPerSubSale.div(new BN("7")).mul(new BN("1"))
+        tokensPerSubsale.div(new BN("7")).mul(new BN("1"))
       ),
       "The buyer B has not been given the right amount of tokens"
     );
 
     assert(
       toBN(await token.balanceOf(buyerC)).eq(
-        tokensPerSubSale.div(new BN("7")).mul(new BN("2"))
+        tokensPerSubsale.div(new BN("7")).mul(new BN("2"))
       ),
       "The buyer C has not been given the right amount of tokens"
     );
 
     assert(
       toBN(await token.balanceOf(buyerD)).eq(
-        tokensPerSubSale.div(new BN("7")).mul(new BN("2"))
+        tokensPerSubsale.div(new BN("7")).mul(new BN("2"))
       ),
       "The buyer D has not been given the right amount of tokens"
     );
 
-    console.log(toBN(await token.balanceOf(buyerE)).toString());
-
     assert(
       toBN(await token.balanceOf(buyerE)).eq(
-        tokensPerSubSale.div(new BN("7")).mul(new BN("1"))
+        tokensPerSubsale.div(new BN("7")).mul(new BN("1"))
       ),
       "The buyer E has not been given the right amount of tokens"
     );
@@ -433,5 +469,175 @@ contract("ContinuousIICO", function(accounts) {
       toBN(await token.balanceOf(buyerF)).eq(new BN("0")),
       "The buyer F has been given tokens while the bid should not be accepted."
     );
+  });
+
+  it("Should correctly show current valuation and cut off", async function() {
+    let head = await iico.bids(0);
+    let tailID = uint256Max;
+    let token = await MintableToken.new({ from: owner });
+    await token.mint(iico.address, tokensToMint, { from: owner });
+    await iico.setToken(token.address, { from: owner });
+    await iico.startSale(0, { from: owner });
+
+    const Valuation1 = new BN("10").pow(new BN("18"));
+    const Valuation2 = new BN("10").pow(new BN("18"));
+    const Valuation3 = new BN("10").pow(new BN("18"));
+    const Valuation4 = new BN("10").pow(new BN("18")).div(new BN("2"));
+    const Valuation5 = new BN("10").pow(new BN("18"));
+
+    await iico.searchAndBidToOngoingSubsale(Valuation1, tailID, {
+      from: buyerA,
+      value: 0.1e18
+    }); // Bid 1.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerB,
+      value: 0.1e18
+    }); // Bid 2.
+    await iico.searchAndBidToOngoingSubsale(Valuation4, tailID, {
+      from: buyerC,
+      value: 0.2e18
+    }); // Bid 3.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerD,
+      value: 0.15e18
+    }); // Bid 4
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerE,
+      value: 0.1e18
+    }); // Bid 5.
+    await iico.searchAndBidToOngoingSubsale(Valuation4, tailID, {
+      from: buyerF,
+      value: 0.1e18
+    }); // Bid 6.
+
+    const {
+      valuation,
+      currentCutOffBidID,
+      currentCutOffBidMaxValuation,
+      currentCutOffBidContrib
+    } = await iico.valuationAndCutOff();
+
+    console.log(valuation.toString());
+
+    assert(valuation.eq(new BN("10").pow(new BN("17")).mul(new BN("5"))));
+    assert.equal(currentCutOffBidID, 6);
+    assert(
+      currentCutOffBidMaxValuation.eq(
+        new BN("10").pow(new BN("17")).mul(new BN("5"))
+      )
+    );
+    assert(
+      currentCutOffBidContrib.eq(
+        new BN("10").pow(new BN("16")).mul(new BN("5"))
+      )
+    );
+  });
+
+  it("Should correctly finalize a multiple subsale case", async function() {
+    let head = await iico.bids(0);
+    let tailID = uint256Max;
+    let token = await MintableToken.new({ from: owner });
+    await token.mint(iico.address, tokensToMint, { from: owner });
+    await iico.setToken(token.address, { from: owner });
+    await iico.startSale(0, { from: owner });
+
+    const Valuation1 = new BN("10").pow(new BN("18"));
+    const Valuation2 = new BN("10").pow(new BN("18"));
+    const Valuation3 = new BN("10").pow(new BN("18"));
+    const Valuation4 = new BN("10").pow(new BN("18")).div(new BN("2"));
+    const Valuation5 = new BN("10").pow(new BN("18"));
+
+    await iico.searchAndBidToOngoingSubsale(Valuation1, tailID, {
+      from: buyerA,
+      value: 0.1e18
+    }); // Bid 1.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerB,
+      value: 0.1e18
+    }); // Bid 2.
+    await iico.searchAndBidToOngoingSubsale(Valuation1, tailID, {
+      from: buyerC,
+      value: 0.2e18
+    }); // Bid 3.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerD,
+      value: 0.15e18
+    }); // Bid 4
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerE,
+      value: 0.1e18
+    }); // Bid 5.
+    await iico.searchAndBidToOngoingSubsale(Valuation4, tailID, {
+      from: buyerF,
+      value: 0.1e18
+    }); // Bid 6.
+
+    await increase(86400);
+
+    await iico.searchAndBidToOngoingSubsale(Valuation1, tailID, {
+      from: buyerA,
+      value: 0.1e18
+    }); // Bid 1.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerB,
+      value: 0.1e18
+    }); // Bid 2.
+    await iico.searchAndBidToOngoingSubsale(Valuation1, tailID, {
+      from: buyerC,
+      value: 0.2e18
+    }); // Bid 3.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerD,
+      value: 0.15e18
+    }); // Bid 4
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerE,
+      value: 0.1e18
+    }); // Bid 5.
+    await iico.searchAndBidToOngoingSubsale(Valuation4, tailID, {
+      from: buyerF,
+      value: 0.1e18
+    }); // Bid 6.
+
+    await increase(86400);
+
+    await iico.searchAndBidToOngoingSubsale(Valuation1, tailID, {
+      from: buyerA,
+      value: 0.1e18
+    }); // Bid 1.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerB,
+      value: 0.1e18
+    }); // Bid 2.
+    await iico.searchAndBidToOngoingSubsale(Valuation1, tailID, {
+      from: buyerC,
+      value: 0.1e18
+    }); // Bid 3.
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerD,
+      value: 0.1e18
+    }); // Bid 4
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+      from: buyerE,
+      value: 0.1e18
+    }); // Bid 5.
+    await iico.searchAndBidToOngoingSubsale(Valuation4, tailID, {
+      from: buyerF,
+      value: 0.1e18
+    }); // Bid 6.
+
+    await shouldFail.reverting(iico.finalize(uint256Max, 1));
+    await iico.finalize(uint256Max, 0); // Finalize day 0.
+    await increase(86400);
+    await iico.finalize(uint256Max, 1); // Finalize day 1.
+    await shouldFail.reverting(iico.finalize(uint256Max, 0));
+    await increase(86400);
+    await iico.finalize(uint256Max, 2); // Finalize day 1.
+    await shouldFail.reverting(iico.finalize(uint256Max, 1));
+
+    for (let i = 0; i < 18; i++) {
+      console.log(await iico.bids(i));
+    }
+    console.log(await iico.finalizationTurn());
   });
 });

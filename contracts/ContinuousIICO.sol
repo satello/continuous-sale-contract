@@ -17,7 +17,7 @@ contract ContinuousIICO {
 
     /** A bid to buy tokens as long as the personal maximum valuation and expiration deadline not expired.
      *  Bids are in a sorted doubly linked list.
-     *  They are sorted in ascending order by maxValuation and secondarily in descending order by expiresAfter.
+     *  They are sorted in ascending order by maxValuation.
      *  The list contains two artificial bids HEAD and TAIL having respectively the minimum and maximum bidID and maxValuation.
      */
     struct Bid {
@@ -29,17 +29,17 @@ contract ContinuousIICO {
         uint contrib;                           // Contribution in wei.
         address contributor;                    // The contributor who placed the bid.
         bool redeemed;                          // True if the ETH or tokens have been redeemed.
-        uint expiresAfter;                      // Expires after given subsale
-        uint acceptedAt;                        // Mark as accepted (redeemable) in a particular subsale
+        uint subsaleNumber;                     // Target subsale of the bid
     }
+
     uint public globalLastBidID = 0;                      // Global bid ID counter, incremented when a new bid summitted.
     mapping (address => uint[]) public contributorBidIDs; // Map contributor to a list of its bid ID.
     mapping (uint => Bid) public bids;                    // Map bidID to bid.
 
     /* *** Sale constants *** */
-    uint public durationPerSubSale;             // Duration per subsale in seconds.
-    uint public numberOfSubSales;               // Number of subsales
-    uint public tokensPerSubSale;               // Will be assigned with (tokensForSale/numberOfSubSales)
+    uint public durationPerSubsale;             // Duration per subsale in seconds.
+    uint public numberOfSubsales;               // Number of subsales
+    uint public tokensPerSubsale;               // Will be assigned with (tokensForSale/numberOfSubsales)
 
     /* *** Sale parameters *** */
     uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch
@@ -49,16 +49,33 @@ contract ContinuousIICO {
 
     /* *** Finalization variables *** */
     uint public finalizationTurn = 0;           // Finalization of subsale N requires subsale to be finalized. This counter keeps track of latest finalization.
-    uint public cutOffBidID = TAIL;                    // Cutoff point for the ongoing subsale.
+    uint[365] public cutOffBidIDs;                    // Cutoff point for the ongoing subsale.
     uint[365] public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
-    event BidSubmitted(address contributor, uint expiresAfter, uint bidID, uint time);
+    event BidSubmitted(uint subsaleNumber, address contributor, uint bidID, uint maxValuation, uint time, uint prev, uint next);
 
+    // TO BE REMOVED - HAS NO EFFECT TO CONTRACT LOGIC - ONLY FOR DEBUGGING PURPOSES
     /* *** Debugging Events *** */
     event CutOffBidIDInit(uint subsaleNumber);
     event Redeemed(uint bidID);
     event Reimbursed(uint bidID);
+    event PointerUpdated(uint bidID, string pointer, uint newTarget);
+    event Accepted(uint bidID, uint raisedSoFar);
+    event CutOffFound(uint bidID, uint raisedSoFar);
+    event Removing(uint bidID);
+    event Here(uint flag);
+    event Finalizing(uint subSaleNumber);
+    event Print(uint pointer);
+
+    /* Debugging Functions */
+    function printLinkedList() public view {
+        uint pointer = TAIL;
+        while (pointer != HEAD){
+            pointer = bids[pointer].prev;
+            emit Print(pointer);
+        }
+    }
 
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
@@ -73,28 +90,26 @@ contract ContinuousIICO {
     constructor(address _beneficiary, uint _numberOfSubsales, uint _durationPerSubsale) public {
         owner = msg.sender;
         beneficiary = _beneficiary;
-        numberOfSubSales = _numberOfSubsales;
-        durationPerSubSale = _durationPerSubsale;
+        numberOfSubsales = _numberOfSubsales;
+        durationPerSubsale = _durationPerSubsale;
 
         bids[HEAD] = Bid({
-            prev: HEAD, // Not a circular linked-list.
+            prev: TAIL,
             next: TAIL,
             maxValuation: 0,
             contrib: 0,
             contributor: address(0),
             redeemed: false,
-            acceptedAt: uint(-1),
-            expiresAfter: uint(-1)
+            subsaleNumber: uint(-1)
         });
         bids[TAIL] = Bid({
             prev: HEAD,
-            next: TAIL, // Not a circular linked-list.
+            next: HEAD,
             maxValuation: uint(-1),
             contrib: 0,
             contributor: address(0),
             redeemed: false,
-            acceptedAt: uint(-1),
-            expiresAfter: 0
+            subsaleNumber: uint(-1)
         });
     }
 
@@ -102,7 +117,7 @@ contract ContinuousIICO {
      *  @param _beneficiary Beneficiary of the raised funds.
      */
     function changeBeneficiary(address _beneficiary) public onlyOwner {
-      beneficiary = _beneficiary;
+        beneficiary = _beneficiary;
     }
 
     /*  @dev Starts the sale. Requires token to be set and requires to have a non-zero balance of the token.
@@ -113,10 +128,9 @@ contract ContinuousIICO {
         require(tokensForSale != 0, "Zero token balance for sale.");
 
         startTime = now + _delay;
-        endTime = startTime + (numberOfSubSales * durationPerSubSale);
-        tokensPerSubSale = tokensForSale / numberOfSubSales;
+        endTime = startTime + (numberOfSubsales * durationPerSubsale);
+        tokensPerSubsale = tokensForSale / numberOfSubsales;
     }
-
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
      *  @param _token The token to be sold.
@@ -129,15 +143,13 @@ contract ContinuousIICO {
         tokensForSale = token.balanceOf(this);
     }
 
-
-
     /** @dev Submit a bid. The caller must give the exact position the bid must be inserted into in the list.
      *  In practice, use searchAndBid to avoid the position being incorrect due to a new bid being inserted and changing the position the bid must be inserted at.
+     *  @param _subsaleNumber Target subsale of the bid.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
-     *  @param _expiresAfter Expiration deadline of the bid. A bid which is not accepted in currently ongoing subsale may be accepted in future subsales if not get expired.
      *  @param _next The bidID of the next bid in the list.
      */
-    function submitBid(uint _maxValuation, uint _expiresAfter, uint _next) public payable {
+    function submitBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
         Bid storage nextBid = bids[_next];
         uint prev = nextBid.prev;
         Bid storage prevBid = bids[prev];
@@ -147,7 +159,9 @@ contract ContinuousIICO {
         ++globalLastBidID; // Increment the globalLastBidID. It will be the new bid's ID.
         // Update the pointers of neighboring bids.
         prevBid.next = globalLastBidID;
+        emit PointerUpdated(prev, "next", globalLastBidID);
         nextBid.prev = globalLastBidID;
+        emit PointerUpdated(_next, "prev", globalLastBidID);
 
         // Insert the bid.
         bids[globalLastBidID] = Bid({
@@ -157,28 +171,46 @@ contract ContinuousIICO {
             contrib: msg.value,
             contributor: msg.sender,
             redeemed: false,
-            expiresAfter: _expiresAfter,
-            acceptedAt: uint(-1)
+            subsaleNumber: _subsaleNumber
         });
 
         // Add the bid to the list of bids by this contributor.
         contributorBidIDs[msg.sender].push(globalLastBidID);
 
         // Emit event
-        emit BidSubmitted(msg.sender, _expiresAfter, globalLastBidID, now);
+        emit BidSubmitted(_subsaleNumber, msg.sender, globalLastBidID, _maxValuation, now, prev, _next);
     }
 
+    /** @dev Submit a bid to ongoing subsale. The caller must give the exact position the bid must be inserted into in the list.
+     *  In practice, use searchAndBid to avoid the position being incorrect due to a new bid being inserted and changing the position the bid must be inserted at.
+     *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
+     *  @param _next The bidID of the next bid in the list.
+     */
+    function submitBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
+        submitBid(getOngoingSubsaleNumber(), _maxValuation, _next);
+    }
 
     /** @dev Search for the correct insertion spot and submit a bid.
      *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
      *  The UI must first call search to find the best point to start the search such that it consumes the least amount of gas possible.
      *  Using this function instead of calling submitBid directly prevents it from failing in the case where new bids are added before the transaction is executed.
+     *  @param _subsaleNumber Target subsale of the bid.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
-     *  @param _expiresAfter Expiration deadline of the bid. A bid which is not accepted in currently ongoing subsale may be accepted in future subsales if not get expired.
      *  @param _next The bidID of the next bid in the list.
      */
-    function searchAndBid(uint _maxValuation, uint _expiresAfter, uint _next) public payable {
-        submitBid(_maxValuation, _expiresAfter, search(_maxValuation, _expiresAfter, _next));
+    function searchAndBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
+        submitBid(_subsaleNumber, _maxValuation, search(_maxValuation, _next));
+    }
+
+    /** @dev Search for the correct insertion spot and submit a bid to the ongoing subsale.
+     *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
+     *  The UI must first call search to find the best point to start the search such that it consumes the least amount of gas possible.
+     *  Using this function instead of calling submitBid directly prevents it from failing in the case where new bids are added before the transaction is executed.
+     *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
+     *  @param _next The bidID of the next bid in the list.
+     */
+    function searchAndBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
+        searchAndBid(getOngoingSubsaleNumber(), _maxValuation, search(_maxValuation, _next));
     }
 
 
@@ -187,26 +219,40 @@ contract ContinuousIICO {
      *  The function is O(min(n,_maxIt)) where n is the amount of bids. In total it will perform O(n) computations, possibly in multiple calls.
      *  Each call only has a O(1) storage write operations.
      *  @param _maxIt The maximum amount of bids to go through. This value must be set in order to not exceed the gas limit.
-     *  @param _subSaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
+     *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
      */
-    function finalize(uint _maxIt, uint _subSaleNumber) public {
-        require(now >= endTimeOfSubSale(_subSaleNumber), "This subsale is not due yet.");
-        require(finalizationTurn == _subSaleNumber, "There are previous subsales which are not finalized yet. Please finalize them first.");
+    function finalize(uint _maxIt, uint _subsaleNumber) public {
+        require(now >= endTimeOfSubsale(_subsaleNumber), "This subsale is not due yet.");
+        require(finalizationTurn == _subsaleNumber, "You can not finalize this subsale.");
+
+        printLinkedList();
+
+        emit Finalizing(_subsaleNumber);
+        if(cutOffBidIDs[_subsaleNumber] == 0)
+            cutOffBidIDs[_subsaleNumber] = TAIL;
 
         // Make local copies of the finalization variables in order to avoid modifying storage in order to save gas.
-        uint localCutOffBidID = cutOffBidID;
-        uint localSumAcceptedContrib = sumAcceptedContribs[_subSaleNumber];
+        uint localCutOffBidID = cutOffBidIDs[_subsaleNumber];
+        uint localSumAcceptedContrib = sumAcceptedContribs[_subsaleNumber];
 
         // Search for the cut-off bid while adding the contributions.
-        for (uint it = 0; it < _maxIt && (finalizationTurn == _subSaleNumber); ++it) {
+        for (uint it = 0; it < _maxIt && (finalizationTurn == _subsaleNumber); ++it) {
             Bid storage bid = bids[localCutOffBidID];
-            if(bid.expiresAfter < _subSaleNumber || bid.acceptedAt < numberOfSubSales){ // This bid is expired or accepted already, we will remove it from the linked list
-                bids[bid.prev].next = bid.next; // Removes nodes from the linked list by bypassing them.
-                bids[bid.next].prev = bid.prev; // A->B ; B->C; becomes A->C
+            // Loops stops after finding cutOff, so cleanup is half done.
+            if( bid.subsaleNumber != _subsaleNumber && localCutOffBidID != TAIL){
+                if(bid.subsaleNumber < _subsaleNumber)
+                {
+                    emit Removing(localCutOffBidID);
+                    emit PointerUpdated(bid.prev, "next", bid.next);
+                    emit PointerUpdated(bid.next, "prev", bid.prev);
+                    bids[bid.prev].next = bid.next; // Removes nodes from the linked list by bypassing them.
+                    bids[bid.next].prev = bid.prev; // A->B ; B->C; becomes A->C
+                }
+                localCutOffBidID = bid.prev;
             }
             else if (bid.contrib+localSumAcceptedContrib < bid.maxValuation) { // We haven't found the cut-off yet.
-                bid.acceptedAt = _subSaleNumber;
                 localSumAcceptedContrib += bid.contrib;
+                emit Accepted(localCutOffBidID, localSumAcceptedContrib / 1 finney);
                 localCutOffBidID = bid.prev; // Go to the previous bid.
 
             } else { // We found the cut-off. This bid will be taken partially.
@@ -215,19 +261,17 @@ contract ContinuousIICO {
                 contribCutOff = contribCutOff < bid.contrib ? contribCutOff : bid.contrib; // The amount that stays in the sale should not be more than the original contribution. This line is not required but it is added as an extra security measure.
                 bid.contributor.send(bid.contrib-contribCutOff); // Send the non-accepted part. Use send in order to not block if the contributor's fallback reverts.
                 bid.contrib = contribCutOff; // Update the contribution value.
-                bid.acceptedAt = _subSaleNumber;
+                bid.subsaleNumber = _subsaleNumber;
                 localSumAcceptedContrib += bid.contrib;
                 beneficiary.send(localSumAcceptedContrib); // Use send in order to not block if the beneficiary's fallback reverts.
-
-                cutOffBidID = TAIL; // Reset cutOff point for finalization of the next subsale.
+                emit CutOffFound(localCutOffBidID, localSumAcceptedContrib / 1 finney);
             }
         }
 
         // Update storage.
-        cutOffBidID = localCutOffBidID;
-        sumAcceptedContribs[_subSaleNumber] = localSumAcceptedContrib;
+        cutOffBidIDs[_subsaleNumber] = localCutOffBidID;
+        sumAcceptedContribs[_subsaleNumber] = localSumAcceptedContrib;
     }
-
 
     /** @dev Redeem a bid. If the bid is accepted, send the tokens. Otherwise refund ETH contribution.
      *  Note that anyone can call this function, not only the party which made the bid.
@@ -235,22 +279,16 @@ contract ContinuousIICO {
      */
     function redeem(uint _bidID) public {
         Bid storage bid = bids[_bidID];
+        uint cutOffBidID = cutOffBidIDs[bid.subsaleNumber];
+        Bid storage cutOffBid = bids[cutOffBidID];
         require(!bid.redeemed, "This bid is already redeemed.");
+        require(isBidFinalized(_bidID), "This bid is not finalized yet.");
 
         bid.redeemed = true;
-        if(isBidExpired(_bidID)){
+        if (bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && _bidID >= cutOffBidID)) // Give tokens if the bid is accepted.
+            require(token.transfer(bid.contributor, (tokensPerSubsale * bid.contrib) / sumAcceptedContribs[bid.subsaleNumber]), "Failed to redeem.");
+        else  // Reimburse ETH otherwise.
             bid.contributor.transfer(bid.contrib);
-            emit Reimbursed(_bidID);
-        }
-        else if(isBidAccepted(_bidID))
-        {
-            require(token.transfer(bid.contributor, (tokensPerSubSale * (bid.contrib) / sumAcceptedContribs[bid.acceptedAt])), "Failed to transfer Pinakions.");
-            emit Redeemed(_bidID);
-        }
-        // Else the bid is still valid, either will be accepted or get expired in following subsales.
-        else {
-            revert("This bid is neither accepted nor expired.");
-        }
     }
 
     /** @dev Fallback. Make a bid if ETH are sent. Redeem all the bids of the contributor otherwise.
@@ -259,12 +297,12 @@ contract ContinuousIICO {
      */
     function () public payable {
         if (msg.value != 0)                                   // Make a bid with an infinite maxValuation and no expiration deadline if some ETH was sent.
-            submitBid(INFINITY, numberOfSubSales-1, TAIL);    // expiresAfter argument doesn't matter actually as maxValuation is astronomic the bid will be accepted anyway.
+            submitBidToOngoingSubsale(INFINITY, TAIL);      // expiresAfter argument doesn't matter actually as maxValuation is astronomic the bid will be accepted anyway.
         else if (msg.value == 0)                              // Else, redeem all the non redeemed bids if no ETH was sent.
             for (uint i = 0; i < contributorBidIDs[msg.sender].length; ++i)
             {
                 uint bidID = contributorBidIDs[msg.sender][i];
-                if ((isBidAccepted(bidID) || isBidExpired(bidID)) && !bids[bidID].redeemed) // Select eligible bids to avoid a call that will cause a revert.
+                if ((isBidFinalized(bidID)) && !bids[bidID].redeemed) // Select eligible bids to avoid a call that will cause a revert.
                     redeem(bidID);
             }
     }
@@ -274,48 +312,36 @@ contract ContinuousIICO {
     /*  @dev Returns the number of currently ongoing subsale.
      *  note that there will be one and only one active(ongoing) sale between the window of startTime and endTime.
      */
-    function getOngoingSubSaleNumber() public view returns(uint) {
+    function getOngoingSubsaleNumber() public view returns(uint) {
         require(now >= startTime, "Sale not started yet.");
         require(now < endTime, "Sale already ended.");
-        return (now - startTime) / durationPerSubSale;
+        return (now - startTime) / durationPerSubsale;
     }
 
     /** @dev Returns the time when a particular subsale is due.
-     *  @param _subSaleNumber Number of subsale: [0, numberOfSubSales-1]
+     *  @param _subsaleNumber Number of subsale: [0, numberOfSubsales-1]
      *  @return End time of given subsale.
      */
-    function endTimeOfSubSale(uint _subSaleNumber) public view returns(uint) {
-        return startTime + (_subSaleNumber * durationPerSubSale) + durationPerSubSale;
+    function endTimeOfSubsale(uint _subsaleNumber) public view returns(uint) {
+        return startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale;
     }
 
-    /** @dev Returns if the bid is in accepted state or not. Accepted means bid is accepted in one of the previous subsales,
-     *  and the contribution (fully or partially if cutten off) is eligible to be redeemed with the token that is sold by this contract.
-     *  Default value is uint(-1), means not accepted yet.
+    /** @dev Returns if the bid is finalized.
      *  @param _bidID ID of the bid to be queried.
-     *  @return True if given bid is accepted, false otherwise.
+     *  @return True if given bid is finalized, false otherwise.
      */
-    function isBidAccepted(uint _bidID) public view returns(bool) {
-        return bids[_bidID].acceptedAt < numberOfSubSales;
+    function isBidFinalized(uint _bidID) public view returns(bool) {
+        return bids[_bidID].subsaleNumber < finalizationTurn;
     }
 
-    /** @dev Returns if the bid is in expired state or not. Expired means bid is NOT processed by finalization,
-     *  and expiration deadline is passed. Contribution is ready to be refunded.
-     *  @param _bidID ID of the bid to be queried.
-     *  @return True if given bid is expired, false otherwise.
-     */
-    function isBidExpired(uint _bidID) public view returns(bool) {
-        Bid storage bid = bids[_bidID];
-        return !isBidAccepted(_bidID) && bid.expiresAfter < finalizationTurn;
-    }
 
     /** @dev Search for the correct insertion spot of a bid.
      *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
      *  @param _maxValuation The maximum valuation given by the contributor. Or INFINITY if no maximum valuation is given. Primary key for sorting.
-     *  @param _expiresAfter Expiration deadline of the bid. Secondary key for sorting.
      *  @param _nextStart The bidID of the next bid from the initial position to start the search from.
      *  @return nextInsert The bidID of the next bid from the position the bid must be inserted at.
      */
-    function search(uint _maxValuation, uint _expiresAfter, uint _nextStart) public view returns(uint nextInsert) {
+    function search(uint _maxValuation, uint _nextStart) view public returns(uint nextInsert) {
         uint next = _nextStart;
         bool found;
 
@@ -324,41 +350,18 @@ contract ContinuousIICO {
             uint prev = nextBid.prev;
             Bid storage prevBid = bids[prev];
 
-            if (_maxValuation < prevBid.maxValuation)
-            {   // It should be inserted before.
+            if (_maxValuation < prevBid.maxValuation)       // It should be inserted before.
                 next = prev;
-            }
-            else if (_maxValuation > nextBid.maxValuation) // It should be inserted after. The second value we sort by is bidID. Those are increasing, thus if the next bid is of the same maxValuation, we should insert after it.
-            {
+            else if (_maxValuation >= nextBid.maxValuation) // It should be inserted after. The second value we sort by is bidID. Those are increasing, thus if the next bid is of the same maxValuation, we should insert after it.
                 next = nextBid.next;
-            }
-
-            else if (_maxValuation == nextBid.maxValuation) // It should be inserted after. The second value we sort by is expiresAfter.
-            {
-                // If bids have the same max valuation, prioritize the bid with closest expiration deadline.
-                if(_expiresAfter > prevBid.expiresAfter)
-                {
-                    next = prev;
-                }
-                else if (_expiresAfter < nextBid.expiresAfter)
-                {
-                    next = nextBid.next;
-                }
-                else {
-                    found = true; // We found the insertion point.
-                }
-            }
-
-            else {
-                found = true; // We found the insertion point.
-            }
-
+            else                                            // We found the insertion point.
+                found = true;
         }
 
         return next;
     }
 
-    /** @dev Get the total contribution of an address. Doesn't count expired bids.
+    /** @dev Get the total contribution of an address. Doesn't count rejected bids.
      *  This can be used for a KYC threshold.
      *  This function is O(n) where n is the amount of bids made by the contributor.
      *  This means that the contributor can make totalContrib(contributor) revert due to an out of gas error on purpose.
@@ -366,10 +369,21 @@ contract ContinuousIICO {
      *  @return contribution The total contribution of the contributor.
      */
     function totalContrib(address _contributor) public view returns (uint contribution) {
-        for (uint i = 0; i < contributorBidIDs[_contributor].length; ++i)
+        for (uint i = 0; i < contributorBidIDs[_contributor].length; ++i){
             uint bidID = contributorBidIDs[_contributor][i];
-            if(!isBidExpired(contributorBidIDs[_contributor][i]))
-              contribution += bids[bidID].contrib;
+            Bid storage bid = bids[bidID];
+            uint cutOffBidID = cutOffBidIDs[bid.subsaleNumber];
+            Bid storage cutOffBid = bids[cutOffBidID];
+
+            if(isBidFinalized(bidID)){ // The bid is finalized.
+                if(bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && bidID >= cutOffBidID)){ // Bid accepted.
+                    contribution += bid.contrib;
+                }
+            }
+            else{ // The bid is still active.
+                contribution += bid.contrib;
+            }
+        }
     }
 
 
@@ -382,18 +396,21 @@ contract ContinuousIICO {
      */
     function valuationAndCutOff() public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidMaxValuation, uint currentCutOffBidContrib) {
         currentCutOffBidID = bids[TAIL].prev;
-        uint subSaleNumber = getOngoingSubSaleNumber();
+        uint subSaleNumber = getOngoingSubsaleNumber();
 
         // Loop over all bids or until cut off bid is found
         while (currentCutOffBidID != HEAD) {
             Bid storage bid = bids[currentCutOffBidID];
-            if (bid.expiresAfter < subSaleNumber || bid.acceptedAt < numberOfSubSales){
-                continue;
+            if ( bid.subsaleNumber != subSaleNumber){
+                emit Here(subSaleNumber);
+                currentCutOffBidID = bid.prev;
             }
             else if (bid.contrib + valuation < bid.maxValuation) { // We haven't found the cut-off yet.
+
                 valuation += bid.contrib;
                 currentCutOffBidID = bid.prev; // Go to the previous bid.
             } else { // We found the cut-off bid. This bid will be taken partially.
+
                 currentCutOffBidContrib = bid.maxValuation >= valuation ? bid.maxValuation - valuation : 0; // The amount of the contribution of the cut-off bid that can stay in the sale without spilling over the maxValuation.
                 valuation += currentCutOffBidContrib;
                 break;
