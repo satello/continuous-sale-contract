@@ -1,9 +1,28 @@
 /* THIS IS A WORK IN PROGRESS, DO NOT TRUST THIS CONTRACT! */
 
+/**
+ *  @authors: [@ferittuncer]
+ *  @reviewers: []
+ *  @auditors: []
+ *  @bounties: []
+ *  @deployments: []
+ */
+
 pragma solidity ^0.4.25;
 
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
+/** @title Continuous Interactive Initial Coin Offering Contract
+ *  This contract implements the Interactive Coin Offering token sale as described in this paper:
+ *  https://people.cs.uchicago.edu/~teutsch/papers/ico.pdf
+ *  Implementation details and modifications compared to the paper:
+ *  - A fixed amount of tokens is sold. This allows more flexibility for the distribution of the remaining tokens (rounds, team tokens which can be preallocated, non-initial sell of some cryptographic assets).
+ *  - The valuation pointer is only moved when the sale is over. This greatly reduces the amount of write operations and code complexity. However, at least one party must make one or multiple calls to finalize the sale.
+ *  - Buckets are not used as they are not required and increase code complexity.
+ *  - The bid submitter must provide the insertion spot. A search of the insertion spot is still done in the contract just in case the one provided was wrong or other bids were added between when the TX got signed and executed, but giving the search starting point greatly lowers gas consumption.
+ *  - Calling the fallback function while sending ETH places a bid with an infinite maximum valuation. This allows buyers who want to buy no matter the price not need to use a specific interface and just send ETH. Without ETH, a call to the fallback function redeems the bids of the caller.
+ *  - The main sale has many subsales which is in-effect similar to running multiple interactive initial coin offerings consecutively.
+ */
 contract ContinuousIICO {
 
     /* *** General *** */
