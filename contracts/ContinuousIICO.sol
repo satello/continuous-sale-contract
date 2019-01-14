@@ -61,7 +61,7 @@ contract ContinuousIICO {
 
     /* *** Sale parameters *** */
     uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch
-    uint public endTime;                        // Ending time of the sale in seconds, UNIX epoch
+    bool public saleStarted = false;
     ERC20 public token;                         // The token which will be sold.
     uint public tokensForSale;                  // Total amount of tokens for sale.
 
@@ -124,7 +124,7 @@ contract ContinuousIICO {
         require(tokensForSale != 0, "Zero token balance for sale.");
 
         startTime = now + _delay;
-        endTime = startTime + (numberOfSubsales * durationPerSubsale);
+        saleStarted = true;
     }
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
@@ -145,12 +145,15 @@ contract ContinuousIICO {
      *  @param _next The bidID of the next bid in the list.
      */
     function submitBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
+        require(saleStarted, "The continuous sale has not started yet.");
+        require(_subsaleNumber <= numberOfSubsales, "This subsale is non-existent.");
+        require(now >= startTime + (_subsaleNumber * durationPerSubsale), "This subsale has not started yet."); // Check that the bids are still open.
+        require(now < startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale has been due."); // Check that the bids are still open.
+
         Bid storage nextBid = bids[_next];
         uint prev = nextBid.prev;
         Bid storage prevBid = bids[prev];
         require(_maxValuation >= prevBid.maxValuation && _maxValuation < nextBid.maxValuation, "Invalid position."); // The new bid maxValuation is higher than the previous one and strictly lower than the next one.
-        require(now >= startTime + (_subsaleNumber * durationPerSubsale), "This subsale has not started yet."); // Check that the bids are still open.
-        require(now < startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale has been due."); // Check that the bids are still open.
 
         ++globalLastBidID; // Increment the globalLastBidID. It will be the new bid's ID.
         // Update the pointers of neighboring bids.
@@ -181,7 +184,7 @@ contract ContinuousIICO {
      *  @param _next The bidID of the next bid in the list.
      */
     function submitBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
-        submitBid(getOngoingSubsaleNumber(), _maxValuation, _next);
+        submitBid(((now - startTime) / durationPerSubsale), _maxValuation, _next);
     }
 
     /** @dev Search for the correct insertion spot and submit a bid.
@@ -204,7 +207,7 @@ contract ContinuousIICO {
      *  @param _next The bidID of the next bid in the list.
      */
     function searchAndBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
-        searchAndBid(getOngoingSubsaleNumber(), _maxValuation, search(_maxValuation, _next));
+        searchAndBid(((now - startTime) / durationPerSubsale), _maxValuation, search(_maxValuation, _next));
     }
 
     /** @dev Finalize by finding the cut-off bid.
@@ -217,6 +220,8 @@ contract ContinuousIICO {
      *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
      */
     function finalize(uint _maxIt, uint _subsaleNumber) public {
+        require(saleStarted, "This continuous sale has not started yet.");
+        require(_subsaleNumber <= numberOfSubsales, "This subsale is non-existent.");
         require(now >= startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale is not due yet.");
         require(finalizationTurn == _subsaleNumber, "You can not finalize this subsale.");
 
@@ -295,15 +300,6 @@ contract ContinuousIICO {
 
     /* *** View Functions *** */
 
-    /*  @dev Returns the number of currently ongoing subsale.
-     *  note that there will be one and only one active(ongoing) sale between the window of startTime and endTime.
-     */
-    function getOngoingSubsaleNumber() public view returns(uint) {
-        require(now >= startTime, "Sale not started yet.");
-        require(now < endTime, "Sale already ended.");
-        return (now - startTime) / durationPerSubsale;
-    }
-
 
     /** @dev Returns if the bid is finalized.
      *  @param _bidID ID of the bid to be queried.
@@ -374,7 +370,7 @@ contract ContinuousIICO {
      */
     function valuationAndCutOff() public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidMaxValuation, uint currentCutOffBidContrib) {
         currentCutOffBidID = bids[TAIL].prev;
-        uint subSaleNumber = getOngoingSubsaleNumber();
+        uint subSaleNumber = (now - startTime) / durationPerSubsale;
 
         // Loop over all bids or until cut off bid is found
         while (currentCutOffBidID != HEAD) {
