@@ -72,7 +72,7 @@ contract ContinuousIICO {
     uint[365] public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
-    event BidSubmitted(uint subsaleNumber, address contributor, uint bidID, uint maxValuation, uint time, uint prev, uint next);
+    event BidSubmitted(uint subsaleNumber, uint bidID, uint time);
 
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
@@ -174,7 +174,7 @@ contract ContinuousIICO {
         contributorBidIDs[msg.sender].push(globalLastBidID);
 
         // Emit event
-        emit BidSubmitted(_subsaleNumber, msg.sender, globalLastBidID, _maxValuation, now, prev, _next);
+        emit BidSubmitted(_subsaleNumber, globalLastBidID, now);
     }
 
     /** @dev Submit a bid to ongoing subsale. The caller must give the exact position the bid must be inserted into in the list.
