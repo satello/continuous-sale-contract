@@ -58,7 +58,6 @@ contract ContinuousIICO {
     /* *** Sale constants *** */
     uint public durationPerSubsale;             // Duration per subsale in seconds.
     uint public numberOfSubsales;               // Number of subsales
-    uint public tokensPerSubsale;               // Will be assigned with (tokensForSale/numberOfSubsales)
 
     /* *** Sale parameters *** */
     uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch
@@ -126,7 +125,6 @@ contract ContinuousIICO {
 
         startTime = now + _delay;
         endTime = startTime + (numberOfSubsales * durationPerSubsale);
-        tokensPerSubsale = tokensForSale / numberOfSubsales;
     }
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
@@ -274,7 +272,7 @@ contract ContinuousIICO {
 
         bid.redeemed = true;
         if (bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && _bidID >= cutOffBidID)) // Give tokens if the bid is accepted.
-            require(token.transfer(bid.contributor, (tokensPerSubsale * bid.contrib) / sumAcceptedContribs[bid.subsaleNumber]), "Failed to redeem.");
+            require(token.transfer(bid.contributor, (tokensForSale / numberOfSubsales * bid.contrib) / sumAcceptedContribs[bid.subsaleNumber]), "Failed to redeem.");
         else  // Reimburse ETH otherwise.
             bid.contributor.transfer(bid.contrib);
     }
