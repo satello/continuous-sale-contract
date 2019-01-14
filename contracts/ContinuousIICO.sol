@@ -151,7 +151,8 @@ contract ContinuousIICO {
         uint prev = nextBid.prev;
         Bid storage prevBid = bids[prev];
         require(_maxValuation >= prevBid.maxValuation && _maxValuation < nextBid.maxValuation, "Invalid position."); // The new bid maxValuation is higher than the previous one and strictly lower than the next one.
-        require(now >= startTime && now < endTime, "Sale hasn't started yet or already ended."); // Check that the bids are still open.
+        require(now >= startTime + (_subsaleNumber * durationPerSubsale), "This subsale has not started yet."); // Check that the bids are still open.
+        require(now < startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale has been due."); // Check that the bids are still open.
 
         ++globalLastBidID; // Increment the globalLastBidID. It will be the new bid's ID.
         // Update the pointers of neighboring bids.
@@ -218,7 +219,7 @@ contract ContinuousIICO {
      *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
      */
     function finalize(uint _maxIt, uint _subsaleNumber) public {
-        require(now >= endTimeOfSubsale(_subsaleNumber), "This subsale is not due yet.");
+        require(now >= startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale is not due yet.");
         require(finalizationTurn == _subsaleNumber, "You can not finalize this subsale.");
 
         if(cutOffBidIDs[_subsaleNumber] == 0)
@@ -250,7 +251,6 @@ contract ContinuousIICO {
                 contribCutOff = contribCutOff < bid.contrib ? contribCutOff : bid.contrib; // The amount that stays in the sale should not be more than the original contribution. This line is not required but it is added as an extra security measure.
                 bid.contributor.send(bid.contrib-contribCutOff); // Send the non-accepted part. Use send in order to not block if the contributor's fallback reverts.
                 bid.contrib = contribCutOff; // Update the contribution value.
-                bid.subsaleNumber = _subsaleNumber;
                 localSumAcceptedContrib += bid.contrib;
                 beneficiary.send(localSumAcceptedContrib); // Use send in order to not block if the beneficiary's fallback reverts.
             }
@@ -306,13 +306,6 @@ contract ContinuousIICO {
         return (now - startTime) / durationPerSubsale;
     }
 
-    /** @dev Returns the time when a particular subsale is due.
-     *  @param _subsaleNumber Number of subsale: [0, numberOfSubsales-1]
-     *  @return End time of given subsale.
-     */
-    function endTimeOfSubsale(uint _subsaleNumber) public view returns(uint) {
-        return startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale;
-    }
 
     /** @dev Returns if the bid is finalized.
      *  @param _bidID ID of the bid to be queried.
