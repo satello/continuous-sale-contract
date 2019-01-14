@@ -67,8 +67,8 @@ contract ContinuousIICO {
 
     /* *** Finalization variables *** */
     uint public finalizationTurn = 0;           // Finalization of subsale N requires subsale to be finalized. This counter keeps track of latest finalization.
-    uint[365] public cutOffBidIDs;              // Cutoff points for subsales.
-    uint[365] public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
+    mapping(uint => uint) public cutOffBidIDs;              // Cutoff points for subsales.
+    mapping(uint => uint) public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
     event BidSubmitted(uint subsaleNumber, uint bidID, uint time);
