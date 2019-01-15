@@ -24,7 +24,7 @@ contract('ContinuousIICO', function(accounts) {
   const tokensToMint = new BN('12').mul(new BN('10').pow(new BN('25')))
   const uint256Max = new BN('2').pow(new BN('256')).sub(new BN('1'))
 
-  const TIME_BEFORE_START = 1000
+  const START_TIME = Math.floor(Date.now()/1000) // Unix epoch now
   const numberOfSubsales = 365
   const durationPerSubsale = 86400
   const noCap = 120000000e18 // for placing bids with no cap
@@ -54,7 +54,7 @@ contract('ContinuousIICO', function(accounts) {
   }
 
   beforeEach('initialize the contract', async function() {
-    iico = await IICO.new(beneficiary, numberOfSubsales, durationPerSubsale, {
+    iico = await IICO.new(beneficiary, numberOfSubsales, durationPerSubsale, START_TIME, {
       from: owner
     })
   })
@@ -101,21 +101,10 @@ contract('ContinuousIICO', function(accounts) {
       (await iico.tokensForSale()).eq(tokensToMint),
       'The tokensForSale is not set correctly'
     )
+
   })
 
-  it('Should start the sale', async () => {
-    const token = await MintableToken.new({ from: owner })
-    await token.mint(iico.address, tokensToMint, {
-      from: owner
-    })
 
-    await shouldFail.reverting(
-      iico.startSale(TIME_BEFORE_START, { from: owner })
-    ) // Token not set yet, should revert.
-
-    await iico.setToken(token.address, { from: owner })
-    await iico.startSale(TIME_BEFORE_START, { from: owner })
-  })
 
   // submitBidToOngoingSubsale
   it('Should submit only valid bids', async () => {
@@ -124,7 +113,6 @@ contract('ContinuousIICO', function(accounts) {
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
-    await iico.startSale(0, { from: owner })
 
     const Valuation1 = new BN('10').pow(new BN('18'))
     const Valuation2 = new BN('10').pow(new BN('17'))
@@ -187,7 +175,6 @@ contract('ContinuousIICO', function(accounts) {
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
-    await iico.startSale(0, { from: owner })
 
     const Valuation1 = new BN('10').pow(new BN('18'))
     const Valuation2 = new BN('10').pow(new BN('17'))
@@ -251,7 +238,6 @@ contract('ContinuousIICO', function(accounts) {
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
-    await iico.startSale(0, { from: owner })
 
     const Valuation1 = new BN('10').pow(new BN('20'))
     const Valuation2 = new BN('10').pow(new BN('19'))
@@ -320,7 +306,6 @@ contract('ContinuousIICO', function(accounts) {
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
-    await iico.startSale(0, { from: owner })
 
     const Valuation1 = new BN('10').pow(new BN('20'))
     const Valuation2 = new BN('10').pow(new BN('19'))
@@ -364,7 +349,15 @@ contract('ContinuousIICO', function(accounts) {
       beneficiary
     )
 
-    await iico.finalize(uint256Max, 0, { from: owner })
+    let finalizationCounter = 0
+    while (true) {
+
+      try{
+        await iico.finalize(uint256Max, finalizationCounter++, { from: owner })
+      }
+      catch(e)
+      {break}
+    }
 
     for (let i = 1; i < 6; i++) {
       await iico.redeem(i, { from: owner })
@@ -437,6 +430,7 @@ contract('ContinuousIICO', function(accounts) {
       'The buyer A has not been given the right amount of tokens'
     )
 
+
     assert(
       toBN(await token.balanceOf(buyerB)).eq(
         tokensPerSubsale.div(new BN('7')).mul(new BN('1'))
@@ -477,7 +471,6 @@ contract('ContinuousIICO', function(accounts) {
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
-    await iico.startSale(0, { from: owner })
 
     const Valuation1 = new BN('10').pow(new BN('18'))
     const Valuation2 = new BN('10').pow(new BN('18'))
@@ -537,7 +530,6 @@ contract('ContinuousIICO', function(accounts) {
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
-    await iico.startSale(0, { from: owner })
 
     const Valuation1 = new BN('10').pow(new BN('18'))
     const Valuation2 = new BN('10').pow(new BN('18'))
@@ -655,7 +647,6 @@ contract('ContinuousIICO', function(accounts) {
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
-    await iico.startSale(0, { from: owner })
 
     await increase(86400)
 
