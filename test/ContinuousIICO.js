@@ -24,9 +24,9 @@ contract('ContinuousIICO', function(accounts) {
   const tokensToMint = new BN('12').mul(new BN('10').pow(new BN('25')))
   const uint256Max = new BN('2').pow(new BN('256')).sub(new BN('1'))
 
-  const START_TIME = Math.floor(Date.now()/1000) // Unix epoch now
+  const START_TIME = Math.floor(Date.now() / 1000) // Unix epoch now
   const numberOfSubsales = 365
-  const durationPerSubsale = 86400
+  const secondsPerSubsale = 86400
   const noCap = 120000000e18 // for placing bids with no cap
   testAccount = buyerE
 
@@ -54,9 +54,15 @@ contract('ContinuousIICO', function(accounts) {
   }
 
   beforeEach('initialize the contract', async function() {
-    iico = await IICO.new(beneficiary, numberOfSubsales, durationPerSubsale, START_TIME, {
-      from: owner
-    })
+    iico = await IICO.new(
+      beneficiary,
+      numberOfSubsales,
+      secondsPerSubsale,
+      START_TIME,
+      {
+        from: owner
+      }
+    )
   })
 
   // Constructor
@@ -75,8 +81,8 @@ contract('ContinuousIICO', function(accounts) {
     )
 
     assert.equal(
-      await iico.durationPerSubsale(),
-      durationPerSubsale,
+      await iico.secondsPerSubsale(),
+      secondsPerSubsale,
       'Duration per subsale is not set correctly.'
     )
   })
@@ -101,10 +107,7 @@ contract('ContinuousIICO', function(accounts) {
       (await iico.tokensForSale()).eq(tokensToMint),
       'The tokensForSale is not set correctly'
     )
-
   })
-
-
 
   // submitBidToOngoingSubsale
   it('Should submit only valid bids', async () => {
@@ -350,14 +353,12 @@ contract('ContinuousIICO', function(accounts) {
     )
 
     let finalizationCounter = 0
-    while (true) {
-
-      try{
+    while (true)
+      try {
         await iico.finalize(uint256Max, finalizationCounter++, { from: owner })
+      } catch (e) {
+        break
       }
-      catch(e)
-      {break}
-    }
 
     for (let i = 1; i < 6; i++) {
       await iico.redeem(i, { from: owner })
@@ -429,7 +430,6 @@ contract('ContinuousIICO', function(accounts) {
       toBN(await token.balanceOf(buyerA)).eq(tokensPerSubsale.div(new BN('7'))),
       'The buyer A has not been given the right amount of tokens'
     )
-
 
     assert(
       toBN(await token.balanceOf(buyerB)).eq(

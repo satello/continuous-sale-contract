@@ -58,7 +58,7 @@ contract ContinuousIICO {
 
     /* *** Sale parameters *** */
     uint public numberOfSubsales;               // Number of subsales, first on index zero last on index numberOfSubsales-1
-    uint public durationPerSubsale;             // Duration per subsale in seconds.
+    uint public secondsPerSubsale;             // Duration per subsale in seconds.
     uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch
     ERC20 public token;                         // The token which will be sold.
     uint public tokensForSale;                  // Total amount of tokens for sale.
@@ -79,14 +79,14 @@ contract ContinuousIICO {
      *  and then setToken needs to be called to finish the setup).
      *  @param _beneficiary Beneficiary of the raised funds.
      *  @param _numberOfSubsales Number of subsales.
-     *  @param _durationPerSubsale Duration per subsale in seconds.
+     *  @param _secondsPerSubsale Duration per subsale in seconds.
      *  @param _startTime Start time of the sale.
      */
-    constructor(address _beneficiary, uint _numberOfSubsales, uint _durationPerSubsale, uint _startTime) public {
+    constructor(address _beneficiary, uint _numberOfSubsales, uint _secondsPerSubsale, uint _startTime) public {
         owner = msg.sender;
         beneficiary = _beneficiary;
         numberOfSubsales = _numberOfSubsales;
-        durationPerSubsale = _durationPerSubsale;
+        secondsPerSubsale = _secondsPerSubsale;
         startTime = _startTime;
 
         // Initialization of artifical bids: The head bid and the tail bid.
@@ -131,7 +131,7 @@ contract ContinuousIICO {
      */
     function submitBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
         require(_subsaleNumber < numberOfSubsales, "This subsale is non-existent.");
-        require(now < startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale has been expired.");
+        require(now < startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale has been expired.");
         require(bids[_next].removed == false, "The bid at the insertion point has been removed from the linked-list already, thus its an invalid insertion point.");
 
         Bid storage nextBid = bids[_next];
@@ -169,7 +169,7 @@ contract ContinuousIICO {
      *  @param _next The bidID of the correct insertion spot in the linked-list.
      */
     function submitBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
-        submitBid(((now - startTime) / durationPerSubsale), _maxValuation, _next);
+        submitBid(((now - startTime) / secondsPerSubsale), _maxValuation, _next);
     }
 
     /** @dev Search for the correct insertion spot and submit a bid.
@@ -192,7 +192,7 @@ contract ContinuousIICO {
      *  @param _next The bidID of the correct insertion spot in the linked-list..
      */
     function searchAndBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
-        searchAndBid(((now - startTime) / durationPerSubsale), _maxValuation, search(_maxValuation, _next));
+        searchAndBid(((now - startTime) / secondsPerSubsale), _maxValuation, search(_maxValuation, _next));
     }
 
     /** @dev Finalize by finding the cut-off bid.
@@ -206,7 +206,7 @@ contract ContinuousIICO {
      */
     function finalize(uint _maxIt, uint _subsaleNumber) public {
         require(_subsaleNumber < numberOfSubsales, "This subsale doesn't exit.");
-        require(now >= startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale is not expired yet.");
+        require(now >= startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale is not expired yet.");
         require(finalizationTurn == _subsaleNumber, "Current finalization turn prevents finalizing this subsale. Either already finalized or there are previous sales to be finalized first.");
 
         if(cutOffBidIDs[_subsaleNumber] == 0)
@@ -359,7 +359,7 @@ contract ContinuousIICO {
      */
     function valuationAndCutOff() public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidMaxValuation, uint currentCutOffBidContrib) {
         currentCutOffBidID = bids[TAIL].prev;
-        uint subSaleNumber = (now - startTime) / durationPerSubsale;
+        uint subSaleNumber = (now - startTime) / secondsPerSubsale;
 
         // Loop over all bids or until cut off bid is found
         while (currentCutOffBidID != HEAD) {
