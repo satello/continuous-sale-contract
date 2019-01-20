@@ -131,7 +131,6 @@ contract ContinuousIICO {
      */
     function submitBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
         require(_subsaleNumber < numberOfSubsales, "This subsale is non-existent.");
-        require(now >= startTime + (_subsaleNumber * durationPerSubsale), "This subsale has not started yet.");
         require(now < startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale has been due.");
         require(bids[_next].removed == false, "The bid at the insertion point has been removed from the linked-list already, thus its an invalid insertion point.");
 
