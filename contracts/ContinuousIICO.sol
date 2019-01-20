@@ -131,7 +131,7 @@ contract ContinuousIICO {
      */
     function submitBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
         require(_subsaleNumber < numberOfSubsales, "This subsale is non-existent.");
-        require(now < startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale has been due.");
+        require(now < startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale has been expired.");
         require(bids[_next].removed == false, "The bid at the insertion point has been removed from the linked-list already, thus its an invalid insertion point.");
 
         Bid storage nextBid = bids[_next];
@@ -205,8 +205,8 @@ contract ContinuousIICO {
      *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
      */
     function finalize(uint _maxIt, uint _subsaleNumber) public {
-        require(_subsaleNumber < numberOfSubsales, "This subsale is non-existent.");
-        require(now >= startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale is not due yet.");
+        require(_subsaleNumber < numberOfSubsales, "This subsale doesn't exit.");
+        require(now >= startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale is not expired yet.");
         require(finalizationTurn == _subsaleNumber, "You can not finalize this subsale.");
 
         if(cutOffBidIDs[_subsaleNumber] == 0)
