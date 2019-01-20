@@ -30,9 +30,9 @@ contract ContinuousIICO {
     address public beneficiary; // The address which will get the funds.
 
     /* *** Bid *** */
-    uint constant HEAD = 0;            // Minimum value used for both the maxValuation and bidID of the head of the linked list.
-    uint constant TAIL = uint(-1);     // Maximum value used for both the maxValuation and bidID of the tail of the linked list.
-    uint constant INFINITY = uint(-2); // A value so high that a bid using it is guaranteed to succeed. Still lower than TAIL to be placed before TAIL.
+    uint public constant HEAD = 0;            // Minimum value used for both the maxValuation and bidID of the head of the linked list.
+    uint public constant TAIL = uint(-1);     // Maximum value used for both the maxValuation and bidID of the tail of the linked list.
+    uint public constant INFINITY = uint(-2); // A value so high that a bid using it is guaranteed to succeed. Still lower than TAIL to be placed before TAIL.
 
     /** A bid to buy tokens as long as the personal maximum valuation and expiration deadline not expired.
      *  Bids are in a sorted doubly linked list.
