@@ -652,5 +652,6 @@ contract('ContinuousIICO', function(accounts) {
 
     await shouldFail.reverting(iico.finalize(uint256Max, 1))
     await iico.finalize(uint256Max, 0) // Finalize day 0.
+    assert(await iico.finalizationTurn(), 1)
   })
 })
