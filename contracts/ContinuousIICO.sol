@@ -199,7 +199,7 @@ contract ContinuousIICO {
      *  Since the amount of bids is not bounded, this function may have to be called multiple times.
      *  The function is O(min(n,_maxIt)) where n is the amount of bids. In total it will perform O(n) computations, possibly in multiple calls.
      *  Each call has only a constant amount of storage write operations.
-     *  The main loop removes inactive bids on stumbling upon. This avoids future finalizations to iterate over.
+     *  The main loop removes inactive accepted bids on stumbling upon. This avoids future finalizations to iterate over.
      *  Note that not every inactive bid will be removed in this process, only if they are stumbled upon.
      *  @param _maxIt The maximum amount of bids to go through. This value must be set in order to not exceed the gas limit.
      *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
