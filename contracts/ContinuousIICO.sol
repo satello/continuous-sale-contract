@@ -207,7 +207,7 @@ contract ContinuousIICO {
     function finalize(uint _maxIt, uint _subsaleNumber) public {
         require(_subsaleNumber < numberOfSubsales, "This subsale doesn't exit.");
         require(now >= startTime + (_subsaleNumber * durationPerSubsale) + durationPerSubsale, "This subsale is not expired yet.");
-        require(finalizationTurn == _subsaleNumber, "You can not finalize this subsale.");
+        require(finalizationTurn == _subsaleNumber, "Current finalization turn prevents finalizing this subsale. Either already finalized or there are previous sales to be finalized first.");
 
         if(cutOffBidIDs[_subsaleNumber] == 0)
             cutOffBidIDs[_subsaleNumber] = TAIL;
