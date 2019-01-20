@@ -57,7 +57,7 @@ contract ContinuousIICO {
     mapping (uint => Bid) public bids;                    // Map bidID to bid.
 
     /* *** Sale parameters *** */
-    uint public numberOfSubsales;               // Number of subsales
+    uint public numberOfSubsales;               // Number of subsales, first on index zero last on index numberOfSubsales-1
     uint public durationPerSubsale;             // Duration per subsale in seconds.
     uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch
     ERC20 public token;                         // The token which will be sold.
