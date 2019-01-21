@@ -112,7 +112,7 @@ contract('ContinuousIICO', function(accounts) {
   // submitBidToOngoingSubsale
   it('Should submit only valid bids', async () => {
     const head = await iico.bids(0)
-    const tailID = uint256Max
+    let tailBidID
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
@@ -131,39 +131,46 @@ contract('ContinuousIICO', function(accounts) {
         }
       )
     ) // Should not work because the insertion position is incorrect
-    await iico.submitBidToOngoingSubsale(Valuation1, tailID, {
+
+    const ongoingSaleNumber = await iico.getOngoingSubsaleNumber()
+    console.log(ongoingSaleNumber.toString())
+    tailBidID = uint256Max.sub(ongoingSaleNumber)
+    headBidID = ongoingSaleNumber
+    await iico.submitBidToOngoingSubsale(Valuation1, tailBidID, {
       from: buyerA,
       value: 0.1e18
     }) // Bid 1.
-    assert.equal(await iico.globalLastBidID(), 1)
-    const s = await iico.search(Valuation2, 0)
+    globalLastBidID = await iico.globalLastBidID()
+    assert.equal(globalLastBidID, 366)
+    const s = await iico.search(ongoingSaleNumber, Valuation2, 0)
     await shouldFail.reverting(
-      iico.submitBidToOngoingSubsale(Valuation2, tailID, {
+      iico.submitBidToOngoingSubsale(Valuation2, tailBidID, {
         from: buyerB,
         value: 0.1e18
       })
     ) // Should not work because not inserted in the right position.
 
-    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+    console.log((await iico.getOngoingSubsaleNumber()).toString())
+    await iico.submitBidToOngoingSubsale(Valuation2, globalLastBidID, {
       from: buyerB,
       value: 0.1e18
     }) // Bid 2.
-    await iico.submitBidToOngoingSubsale(Valuation3, 2, {
+    await iico.submitBidToOngoingSubsale(Valuation3, 367, {
       from: buyerC,
       value: 0.15e18
     }) // Bid 3.
     await shouldFail.reverting(
-      iico.submitBidToOngoingSubsale(Valuation2, 2, {
+      iico.submitBidToOngoingSubsale(Valuation2, 367, {
         from: buyerB,
         value: 0.25e18
       })
     ) // Should not work because not inserted in the right position.
-    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+    await iico.submitBidToOngoingSubsale(Valuation2, 366, {
       from: buyerB,
       value: 0.25e18
     }) // Bid 4
 
-    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailBidID, {
       from: buyerE,
       value: 0.1e18
     }) // Bid 5.
@@ -172,9 +179,9 @@ contract('ContinuousIICO', function(accounts) {
   })
 
   // searchAndBidToOngoingSubsale
-  it('Should finalize in single run', async () => {
+  it.only('Should finalize in single run', async () => {
     const head = await iico.bids(0)
-    const tailID = uint256Max
+    let tailBidID = uint256Max
     const token = await MintableToken.new({ from: owner })
     await token.mint(iico.address, tokensToMint, { from: owner })
     await iico.setToken(token.address, { from: owner })
@@ -182,6 +189,11 @@ contract('ContinuousIICO', function(accounts) {
     const Valuation1 = new BN('10').pow(new BN('18'))
     const Valuation2 = new BN('10').pow(new BN('17'))
     const Valuation3 = new BN('10').pow(new BN('16'))
+
+    const ongoingSaleNumber = await iico.getOngoingSubsaleNumber()
+    console.log(ongoingSaleNumber.toString())
+    tailBidID = uint256Max.sub(ongoingSaleNumber)
+    headBidID = ongoingSaleNumber
 
     await shouldFail.reverting(
       iico.submitBidToOngoingSubsale(
@@ -193,24 +205,24 @@ contract('ContinuousIICO', function(accounts) {
         }
       )
     ) // Should not work because the insertion position is incorrect
-    await iico.submitBidToOngoingSubsale(Valuation1, tailID, {
+    await iico.submitBidToOngoingSubsale(Valuation1, tailBidID, {
       from: buyerA,
       value: 0.1e18
     }) // Bid 1.
-    assert.equal(await iico.globalLastBidID(), 1)
-    const s = await iico.search(Valuation2, 0)
+    assert.equal(await iico.globalLastBidID(), 366)
+    const s = await iico.search(ongoingSaleNumber, Valuation2, 0)
     await shouldFail.reverting(
-      iico.submitBidToOngoingSubsale(Valuation2, tailID, {
+      iico.submitBidToOngoingSubsale(Valuation2, tailBidID, {
         from: buyerB,
         value: 0.1e17
       })
     ) // Should not work because not inserted in the right position.
 
-    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+    await iico.submitBidToOngoingSubsale(Valuation2, 366, {
       from: buyerB,
       value: 0.1e18
     }) // Bid 2.
-    await iico.submitBidToOngoingSubsale(Valuation3, 2, {
+    await iico.submitBidToOngoingSubsale(Valuation3, 367, {
       from: buyerC,
       value: 0.15e18
     }) // Bid 3.
@@ -220,12 +232,12 @@ contract('ContinuousIICO', function(accounts) {
         value: 0.25e18
       })
     ) // Should not work because not inserted in the right position.
-    await iico.submitBidToOngoingSubsale(Valuation2, 1, {
+    await iico.submitBidToOngoingSubsale(Valuation2, 366, {
       from: buyerB,
       value: 0.25e18
     }) // Bid 4
 
-    await iico.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+    await iico.searchAndBidToOngoingSubsale(Valuation2, tailBidID, {
       from: buyerE,
       value: 0.1e17
     }) // Bid 5.
