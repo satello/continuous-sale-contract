@@ -24,7 +24,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
  *  - The main sale has many subsales which is in-effect similar to running multiple interactive initial coin offerings consecutively.
  *  - Subsales are maintained in different linked-lists but all linked-lists are stored in the same mapping `bids`.
  */
-contract ContinuousIICO {
+contract ContinuousSale {
 
     /* *** General *** */
     address public owner;       // The one setting up the contract.

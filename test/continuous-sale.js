@@ -6,12 +6,12 @@ const shouldFail = require('openzeppelin-solidity/test/helpers/shouldFail')
 const MintableToken = artifacts.require(
   'openzeppelin-solidity/contracts/token/ERC20/ERC20Mintable.sol'
 )
-const IICO = artifacts.require('ContinuousIICO')
+const IICO = artifacts.require('ContinuousSale')
 
 const BN = web3.utils.BN // Alias
 const toBN = web3.utils.toBN
 
-contract('ContinuousIICO', function(accounts) {
+contract('ContinuousSale', function(accounts) {
   const owner = accounts[0]
   const beneficiary = accounts[1]
   const buyerA = accounts[2]
@@ -179,7 +179,7 @@ contract('ContinuousIICO', function(accounts) {
   })
 
   // searchAndBidToOngoingSubsale
-  it.only('Should finalize in single run', async () => {
+  it('Should finalize in single run', async () => {
     const head = await iico.bids(0)
     let tailBidID = uint256Max
     const token = await MintableToken.new({ from: owner })
