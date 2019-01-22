@@ -196,7 +196,7 @@ contract ContinuousSale {
      */
     function searchAndBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
         uint ongoingSubsaleNumber = getOngoingSubsaleNumber();
-        searchAndBid(ongoingSubsaleNumber, _maxValuation, search(ongoingSubsaleNumber, _maxValuation, _next));
+        searchAndBid(ongoingSubsaleNumber, _maxValuation, _next);
     }
 
     /** @dev Finalize by finding the cut-off bid.
