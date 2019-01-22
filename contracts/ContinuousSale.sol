@@ -61,7 +61,7 @@ contract ContinuousSale {
     uint public tokensForSale;                  // Total amount of tokens for sale.
 
     /* *** Finalization variables *** */
-    uint public finalizationTurn = 0;                       // Finalization of subsale N requires subsale to be finalized. This counter keeps track of latest finalization.
+    bool[] public finalized;                                // Is subsale finalized?
     mapping(uint => uint) public cutOffBidIDs;              // Cutoff points for subsales.
     mapping(uint => uint) public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
 
@@ -211,14 +211,14 @@ contract ContinuousSale {
     function finalize(uint _maxIt, uint _subsaleNumber) public {
         require(_subsaleNumber < numberOfSubsales, "This subsale doesn't exit.");
         require(now >= startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale is not expired yet.");
-        require(finalizationTurn == _subsaleNumber, "Current finalization turn prevents finalizing this subsale. Either already finalized or there are previous sales to be finalized first.");
+        require(!finalized[_subsaleNumber], "This subsale is already finalized.");
 
         // Make local copies of the finalization variables in order to avoid modifying storage in order to save gas.
         uint localCutOffBidID = cutOffBidIDs[_subsaleNumber];
         uint localSumAcceptedContrib = sumAcceptedContribs[_subsaleNumber];
 
         // Search for the cut-off bid while adding the contributions.
-        for (uint it = 0; it < _maxIt && (finalizationTurn == _subsaleNumber); ++it) {
+        for (uint it = 0; it < _maxIt && !finalized[_subsaleNumber]; ++it) {
             Bid storage bid = bids[localCutOffBidID];
 
             if (bid.contrib+localSumAcceptedContrib < bid.maxValuation) { // We haven't found the cut-off yet.
@@ -226,7 +226,7 @@ contract ContinuousSale {
                 localCutOffBidID = bid.prev; // Go to the previous bid.
 
             } else { // We found the cut-off. This bid will be taken partially.
-                finalizationTurn++; // This subSale is finalized as it found a cut-off, let the next one to be finalized.
+                finalized[_subsaleNumber] = true; // This subSale is finalized as it found a cut-off.
                 uint contribCutOff = bid.maxValuation >= localSumAcceptedContrib ? bid.maxValuation - localSumAcceptedContrib : 0; // The amount of the contribution of the cut-off bid that can stay in the sale without spilling over the maxValuation.
                 contribCutOff = contribCutOff < bid.contrib ? contribCutOff : bid.contrib; // The amount that stays in the sale should not be more than the original contribution. This line is not required but it is added as an extra security measure.
                 bid.contributor.send(bid.contrib-contribCutOff); // Send the non-accepted part. Use send in order to not block if the contributor's fallback reverts.
@@ -250,7 +250,7 @@ contract ContinuousSale {
         uint cutOffBidID = cutOffBidIDs[bid.subsaleNumber];
         Bid storage cutOffBid = bids[cutOffBidID];
         require(!bid.redeemed, "This bid is already redeemed.");
-        require(bids[_bidID].subsaleNumber < finalizationTurn, "This bid is not finalized yet.");
+        require(finalized[bids[_bidID].subsaleNumber], "This bid is not finalized yet.");
 
         bid.redeemed = true;
         if (bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && _bidID >= cutOffBidID)) // Give tokens if the bid is accepted.
@@ -272,7 +272,7 @@ contract ContinuousSale {
             for (uint i = 0; i < contributorBidIDs[msg.sender].length; ++i)
             {
                 uint bidID = contributorBidIDs[msg.sender][i];
-                if (bids[bidID].subsaleNumber < finalizationTurn && !bids[bidID].redeemed) // Select eligible bids to avoid a call that will cause a revert.
+                if (finalized[bids[bidID].subsaleNumber] && !bids[bidID].redeemed) // Select eligible bids to avoid a call that will cause a revert.
                     redeem(bidID);
             }
     }
@@ -333,7 +333,7 @@ contract ContinuousSale {
             Bid storage bid = bids[bidID];
             uint cutOffBidID = cutOffBidIDs[bid.subsaleNumber];
             Bid storage cutOffBid = bids[cutOffBidID];
-            if(bids[bidID].subsaleNumber < finalizationTurn){ // The bid is finalized.
+            if(finalized[bids[bidID].subsaleNumber]){ // The bid is finalized.
                 if(bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && bidID >= cutOffBidID)){ // Bid accepted.
                     contribution += bid.contrib;
                 }
