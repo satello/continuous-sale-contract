@@ -8,7 +8,7 @@
  *  @deployments: []
  */
 
-pragma solidity ^0.4.25;
+pragma solidity ^0.5.3;
 
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
@@ -28,7 +28,7 @@ contract ContinuousSale {
 
     /* *** General *** */
     address public owner;       // The one setting up the contract.
-    address public beneficiary; // The address which will get the funds.
+    address payable public beneficiary; // The address which will get the funds.
 
     uint public constant INFINITY = uint(-2);   // An astronomic number which is still less than uint(-1) which is the maxValuation of TAIL bids.
 
@@ -44,7 +44,7 @@ contract ContinuousSale {
         /* ***     Bid Members     *** */
         uint maxValuation;                      // Maximum valuation in wei beyond which the contributor prefers refund.
         uint contrib;                           // Contribution in wei.
-        address contributor;                    // The contributor who placed the bid.
+        address payable contributor;                    // The contributor who placed the bid.
         bool redeemed;                          // True if the ether contribution reimbursed or tokens have been redeemed.
         uint subsaleNumber;                     // Target subsale of the bid
     }
@@ -79,7 +79,7 @@ contract ContinuousSale {
      *  @param _secondsPerSubsale Duration per subsale in seconds.
      *  @param _startTime Start time of the sale.
      */
-    constructor(address _beneficiary, uint _numberOfSubsales, uint _secondsPerSubsale, uint _startTime) public {
+    constructor(address payable _beneficiary, uint _numberOfSubsales, uint _secondsPerSubsale, uint _startTime) public {
         owner = msg.sender;
         beneficiary = _beneficiary;
         numberOfSubsales = _numberOfSubsales;
@@ -95,10 +95,10 @@ contract ContinuousSale {
      */
     function setToken(ERC20 _token) public onlyOwner {
         require(address(token) == address(0), "Token address has been set already.");         // Make sure the token is not already set.
-        require(_token.balanceOf(this) > 0, "Token balance owned by this contract is zero."); // Make sure the contract received the balance.
+        require(_token.balanceOf(address(this)) > 0, "Token balance owned by this contract is zero."); // Make sure the contract received the balance.
 
         token = _token;
-        tokensForSale = token.balanceOf(this);
+        tokensForSale = token.balanceOf(address(this));
     }
 
     /** @dev Submit a bid. The caller must give the exact position the bid must be inserted into in the list.
@@ -263,7 +263,7 @@ contract ContinuousSale {
      *  Note that the contributor could make this function go out of gas if it has too much bids. This in not a problem as it is still possible to redeem using the redeem function directly.
      *  This allows users to bid and get their tokens back using only send operations.
      */
-    function () public payable {
+    function () external payable {
         uint tailBidIDForOngoingSale = uint(-1) - getOngoingSubsaleNumber();
 
         if (msg.value != 0)                                               // Make a bid with an INFINITY maxValuation if some ETH was sent.
