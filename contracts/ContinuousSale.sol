@@ -12,17 +12,8 @@ pragma solidity ^0.5.3;
 
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
-/** @title Continuous Interactive Initial Coin Offering Contract
- *  This contract implements the Interactive Coin Offering token sale as described in this paper:
- *  https://people.cs.uchicago.edu/~teutsch/papers/ico.pdf
- *  Implementation details and modifications compared to the paper:
- *  - A fixed amount of tokens is sold.
- *  - The valuation pointer is only moved when the sale is over. This greatly reduces the amount of write operations and code complexity. However, at least one party must make one or multiple calls to finalize the sale.
- *  - Buckets are not used as they are not required and increase code complexity.
- *  - The bid submitter must provide the insertion spot. A search of the insertion spot is still done in the contract just in case the one provided was wrong or other bids were added between when the TX got signed and executed, but giving the search starting point greatly lowers gas consumption.
- *  - Calling the fallback function while sending ETH places a bid with an infinite maximum valuation. This allows buyers who want to buy no matter the price not need to use a specific interface and just send ETH. Without ETH, a call to the fallback function redeems the bids of the caller.
- *  - The main sale has many subsales which is in-effect similar to running multiple interactive initial coin offerings consecutively.
- *  - Subsales are maintained in different linked-lists but all linked-lists are stored in the same mapping `bids`.
+/** @title Continuous Sale Contract
+ *  TODO
  */
 contract ContinuousSale {
 
@@ -87,7 +78,6 @@ contract ContinuousSale {
         startTime = _startTime;
 
         globalLastBidID = _numberOfSubsales; // Initialization. bidsIDs with less than _numberOfSubsales are reserved for HEAD bids.
-
     }
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
