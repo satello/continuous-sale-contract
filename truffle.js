@@ -22,7 +22,8 @@ module.exports = {
     development: {
       host: 'localhost',
       network_id: '*',
-      port: 8545
+      port: 8545,
+      time: Date.now() // Did not help for time dependent tests
     },
     kovan: {
       confirmations: 2,
