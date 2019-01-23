@@ -78,6 +78,7 @@ contract ContinuousSale {
         startTime = _startTime;
 
         globalLastBidID = _numberOfSubsales; // Initialization. bidsIDs with less than _numberOfSubsales are reserved for HEAD bids.
+        finalized.length = _numberOfSubsales; // Initialize 
     }
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
