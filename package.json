@@ -24,15 +24,15 @@
     "openzeppelin-test-helpers": "^0.1.2"
   },
   "scripts": {
-    "prettify": "kathari prettify",
-    "lint:sol": "kathari lint:sol",
-    "lint:js": "kathari lint:js",
+    "prettify": "yarn run kathari prettify",
+    "lint:sol": "yarn run kathari lint:sol",
+    "lint:js": "yarn run kathari lint:js",
     "lint": "yarn run lint:sol && yarn run lint:js",
-    "test:ganache": "ganache-cli &",
-    "test:truffle": "truffle test",
+    "test:ganache": "yarun run ganache-cli &",
+    "test:truffle": "yarn run truffle test",
     "test": "run-p test:*",
-    "cz": "kathari cz",
-    "build": "truffle compile --all"
+    "cz": "yarn run kathari cz",
+    "build": "yarn run truffle compile --all"
   },
   "commitlint": {
     "extends": [
@@ -41,8 +41,8 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "kathari precommit",
-      "commit-msg": "kathari commitmsg"
+      "pre-commit": "yarn run kathari precommit",
+      "commit-msg": "yarn run kathari commitmsg"
     }
   }
 }
