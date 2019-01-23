@@ -346,20 +346,20 @@ contract ContinuousSale {
 
     /** @dev Get the current valuation and cut off bid's details on ongoing subsale.
      *  This function is O(n), where n is the amount of bids. This could exceed the gas limit, therefore this function should only be used for interface display and not by other contracts.
+     *  @param _subsaleNumber The number of the subsale to be queried.
      *  @return valuation The current valuation and cut off bid's details.
      *  @return currentCutOffBidID The current cut-off bid.
      *  @return currentCutOffBidMaxValuation The max valuation of the current cut-off bid.
      *  @return currentCutOffBidContrib The contributed amount of current cut-off bid.
      */
-    function valuationAndCutOff() public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidMaxValuation, uint currentCutOffBidContrib) {
-        uint ongoingSubsaleNumber = getOngoingSubsaleNumber();
-        uint headBidIDForOngoingSale = ongoingSubsaleNumber;
-        uint tailBidIDForOngoingSale = uint(-1) - ongoingSubsaleNumber;
+    function valuationAndCutOff(uint _subsaleNumber) public view returns (uint valuation, uint currentCutOffBidID, uint currentCutOffBidMaxValuation, uint currentCutOffBidContrib) {
+        uint headBidID = _subsaleNumber;
+        uint tailBidID = uint(-1) - _subsaleNumber;
 
-        currentCutOffBidID = bids[tailBidIDForOngoingSale].prev;
+        currentCutOffBidID = bids[tailBidID].prev;
 
         // Loop over all bids or until cut off bid is found
-        while (currentCutOffBidID != headBidIDForOngoingSale) {
+        while (currentCutOffBidID != headBidID) {
             Bid storage bid = bids[currentCutOffBidID];
             if (bid.contrib + valuation < bid.maxValuation) { // We haven't found the cut-off yet.
                 valuation += bid.contrib;
