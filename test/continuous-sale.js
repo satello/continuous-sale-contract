@@ -35,26 +35,6 @@ contract('ContinuousSale', function(accounts) {
   let cs
   let startTestTime
 
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms))
-  }
-
-  async function increase(duration) {
-    if (duration < 0)
-      throw new Error(`Cannot increase time by a negative amount (${duration})`)
-
-    await pify(web3.currentProvider.send)({
-      jsonrpc: '2.0',
-      method: 'evm_increaseTime',
-      params: [duration]
-    })
-
-    await pify(web3.currentProvider.send)({
-      jsonrpc: '2.0',
-      method: 'evm_mine'
-    })
-  }
-
   beforeEach('initialize the contract', async function() {
     cs = await ContinuousSale.new(
       beneficiary,
@@ -244,8 +224,8 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e17
     }) // Bid 5.
 
-    await increase(86400)
-    await cs.finalize(uint256Max, 2, { from: buyerB })
+    await time.increase(secondsPerSubsale)
+    await shouldFail.reverting(cs.finalize(uint256Max, 200, { from: buyerB }))
     // assert(await cs.finalized[0])
   })
 
@@ -307,7 +287,7 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 5.
 
-    await increase(86400)
+    await time.increase(secondsPerSubsale)
 
     await cs.finalize(2, 0, { from: buyerB })
     assert.equal(await cs.finalizationTurn(), 0)
@@ -354,7 +334,7 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 6.
 
-    await increase(86400)
+    await time.increase(secondsPerSubsale)
 
     const buyerABalanceBeforeRedeem = await web3.eth.getBalance(buyerA)
     const buyerBBalanceBeforeRedeem = await web3.eth.getBalance(buyerB)
@@ -576,7 +556,7 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 6.
 
-    await increase(86400)
+    await time.increase(secondsPerSubsale)
 
     await cs.searchAndBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
@@ -603,7 +583,7 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 6.
 
-    await increase(86400)
+    await time.increase(secondsPerSubsale)
 
     await cs.searchAndBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
@@ -632,10 +612,10 @@ contract('ContinuousSale', function(accounts) {
 
     await shouldFail.reverting(cs.finalize(uint256Max, 1))
     await cs.finalize(uint256Max, 0) // Finalize day 0.
-    await increase(86400)
+    await time.increase(secondsPerSubsale)
     await cs.finalize(uint256Max, 1) // Finalize day 1.
     await shouldFail.reverting(cs.finalize(uint256Max, 0))
-    await increase(86400)
+    await time.increase(secondsPerSubsale)
     await cs.finalize(uint256Max, 2) // Finalize day 1.
     await shouldFail.reverting(cs.finalize(uint256Max, 1))
 
@@ -662,10 +642,18 @@ contract('ContinuousSale', function(accounts) {
     await token.mint(cs.address, tokensToMint, { from: owner })
     await cs.setToken(token.address, { from: owner })
 
-    await increase(86400)
+    await time.increase(secondsPerSubsale)
 
     await shouldFail.reverting(cs.finalize(uint256Max, 1))
     await cs.finalize(uint256Max, 0) // Finalize day 0.
     assert(await cs.finalizationTurn(), 1)
+  })
+
+  after('revert evm to first snapshot', async function() {
+    await pify(web3.currentProvider.send)({
+      jsonrpc: '2.0',
+      method: 'evm_revert',
+      params: 1
+    })
   })
 })
