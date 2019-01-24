@@ -28,7 +28,7 @@
     "lint:sol": "yarn run kathari lint:sol",
     "lint:js": "yarn run kathari lint:js",
     "lint": "yarn run lint:sol && yarn run lint:js",
-    "test:ganache": "yarun run ganache-cli &",
+    "test:ganache": "yarn run ganache-cli &",
     "test:truffle": "yarn run truffle test",
     "test": "run-p test:*",
     "cz": "yarn run kathari cz",
