@@ -15,12 +15,19 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 /** @title Continuous Sale Contract
  *  A continuous sale contract.
  *  There are multiple subsales.
- *  Each subsale is maintained by a doubly-linked-list with HEAD and TAIL artifical bids (to avoid null checks)
+ *  Each subsale is maintained by a doubly-linked-list with HEAD and TAIL artifical bids (to avoid null checks).
+ *  All the doubly-linked-lists are maintained in a single mapping.
+ *  There is no bonus period and no widthdrawal period. Bids can either get accepted and redeemed or get refused and reimbursed.
+ *  Bids should be submitted to correct spot into the respective linked-list, otherwise will be reverted.
+ *  Search function can help locating correct insertion spot.
+ *  Providing a better first guess to search function reduces the amount of iteration needed for searching correct spot.
+ *  Bidder can use searchAndBid and searchAndBidToOngoingSubsale functions to bid without proving the correct spot, with a gas cost for search function.
+ *  To avoid searching costs, first, call search function and obtain correct spot, then submitBid using the correct spot.
  */
 contract ContinuousSale {
 
     /* *** General *** */
-    address public owner;       // The one setting up the contract.
+    address public owner;               // The one setting up the contract.
     address payable public beneficiary; // The address which will get the funds.
 
     uint public constant INFINITY = uint(-2);   // An astronomic number which is still less than uint(-1) which is the maxValuation of TAIL bids.
@@ -54,12 +61,16 @@ contract ContinuousSale {
     uint public tokensForSale;                  // Total amount of tokens for sale.
 
     /* *** Finalization variables *** */
-    bool[] public finalized;                                // Is subsale finalized?
-    mapping(uint => uint) public cutOffBidIDs;              // Cutoff points for subsales.
-    mapping(uint => uint) public sumAcceptedContribs;       // The sum of accepted contributions for a given subsale.
+    bool[] public finalized;                                          // Is subsale finalized?
+    mapping(uint => uint) public cutOffBidIDForSubsales;              // Cutoff points for subsales.
+    mapping(uint => uint) public sumAcceptedContribs;                 // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
     event BidSubmitted(uint subsaleNumber, uint bidID, uint time);
+    event FinalizationIteration(uint subsaleNumber, uint bidID, uint maxValuation);
+    event FinalizationStarted(uint subsaleNumber);
+    event FinalizationDone(uint subsaleNumber, uint cutOffBidID, uint raised, uint iterationCursor);
+    event Searching(uint subsaleNumber, uint next);
 
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
@@ -98,9 +109,9 @@ contract ContinuousSale {
      *  In practice, use searchAndBid to avoid the position being incorrect due to a new bid being inserted and changing the position the bid must be inserted at.
      *  @param _subsaleNumber Target subsale of the bid.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
-     *  @param _next The bidID of the next bid in the list.
+     *  @param _nextBidID The bidID of the next bid in the list.
      */
-    function submitBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
+    function submitBid(uint _subsaleNumber, uint _maxValuation, uint _nextBidID) public payable {
         uint tailBidID = uint(-1) - _subsaleNumber;
         uint headBidID = _subsaleNumber;
 
@@ -124,14 +135,14 @@ contract ContinuousSale {
                 subsaleNumber: _subsaleNumber
             });
 
-            cutOffBidIDs[_subsaleNumber] = tailBidID;
+            cutOffBidIDForSubsales[_subsaleNumber] = tailBidID;
         }
 
         require(_subsaleNumber < numberOfSubsales, "This subsale is non-existent.");
-        require(now < startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale has been expired.");
-        require(bids[_next].subsaleNumber == _subsaleNumber, "This insertion point is inside another subsales linked-list.");
+        require(now < startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale has ended.");
+        require(bids[_nextBidID].subsaleNumber == _subsaleNumber, "This insertion point is inside another subsales linked-list thus it's an invalid insertion point. You can use search function to search for correct insertion points.");
 
-        Bid storage nextBid = bids[_next];
+        Bid storage nextBid = bids[_nextBidID];
         uint prev = nextBid.prev;
         Bid storage prevBid = bids[prev];
         require(_maxValuation >= prevBid.maxValuation, "Bids should be inserted into a spot where the prev bid doesn't have a higher valuation");
@@ -145,7 +156,7 @@ contract ContinuousSale {
         // Insert the bid.
         bids[globalLastBidID] = Bid({
             prev: prev,
-            next: _next,
+            next: _nextBidID,
             maxValuation: _maxValuation,
             contrib: msg.value,
             contributor: msg.sender,
@@ -200,18 +211,19 @@ contract ContinuousSale {
      *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
      */
     function finalize(uint _maxIt, uint _subsaleNumber) public {
-        require(_subsaleNumber < numberOfSubsales, "This subsale doesn't exit.");
+        require(_subsaleNumber < numberOfSubsales, "This subsale is out of range.");
         require(now >= startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale is not expired yet.");
         require(!finalized[_subsaleNumber], "This subsale is already finalized.");
 
         // Make local copies of the finalization variables in order to avoid modifying storage in order to save gas.
-        uint localCutOffBidID = cutOffBidIDs[_subsaleNumber];
+        uint localCutOffBidID = cutOffBidIDForSubsales[_subsaleNumber];
         uint localSumAcceptedContrib = sumAcceptedContribs[_subsaleNumber];
 
+        emit FinalizationStarted(_subsaleNumber);
         // Search for the cut-off bid while adding the contributions.
         for (uint it = 0; it < _maxIt && !finalized[_subsaleNumber]; ++it) {
             Bid storage bid = bids[localCutOffBidID];
-
+            emit FinalizationIteration(_subsaleNumber, localCutOffBidID, bid.maxValuation);
             if (bid.contrib+localSumAcceptedContrib < bid.maxValuation) { // We haven't found the cut-off yet.
                 localSumAcceptedContrib += bid.contrib;
                 localCutOffBidID = bid.prev; // Go to the previous bid.
@@ -224,12 +236,15 @@ contract ContinuousSale {
                 bid.contrib = contribCutOff; // Update the contribution value.
                 localSumAcceptedContrib += bid.contrib;
                 beneficiary.send(localSumAcceptedContrib); // Use send in order to not block if the beneficiary's fallback reverts.
+
+                emit FinalizationDone(_subsaleNumber, localCutOffBidID, localSumAcceptedContrib, it);
             }
         }
 
         // Update storage. Keeping track of cut-offs and accepted contributions separately as they are needed in redeem function.
-        cutOffBidIDs[_subsaleNumber] = localCutOffBidID;
+        cutOffBidIDForSubsales[_subsaleNumber] = localCutOffBidID;
         sumAcceptedContribs[_subsaleNumber] = localSumAcceptedContrib;
+
     }
 
     /** @dev Redeem a bid. If the bid is accepted, send the tokens. Otherwise refund ETH contribution.
@@ -238,14 +253,14 @@ contract ContinuousSale {
      */
     function redeem(uint _bidID) public {
         Bid storage bid = bids[_bidID];
-        uint cutOffBidID = cutOffBidIDs[bid.subsaleNumber];
+        uint cutOffBidID = cutOffBidIDForSubsales[bid.subsaleNumber];
         Bid storage cutOffBid = bids[cutOffBidID];
         require(!bid.redeemed, "This bid is already redeemed.");
         require(finalized[bids[_bidID].subsaleNumber], "This bid is not finalized yet.");
 
         bid.redeemed = true;
         if (bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && _bidID >= cutOffBidID)) // Give tokens if the bid is accepted.
-            require(token.transfer(bid.contributor, (tokensForSale / numberOfSubsales * bid.contrib) / sumAcceptedContribs[bid.subsaleNumber]), "Failed to transfer redeemed tokens. Rolling back.");
+            require(token.transfer(bid.contributor, tokensForSale / numberOfSubsales * bid.contrib / sumAcceptedContribs[bid.subsaleNumber]), "Failed to transfer redeemed tokens. Rolling back.");
         else  // Reimburse ETH otherwise.
             bid.contributor.transfer(bid.contrib);
     }
@@ -260,6 +275,7 @@ contract ContinuousSale {
         if (msg.value != 0)                                               // Make a bid with an INFINITY maxValuation if some ETH was sent.
             submitBidToOngoingSubsale(INFINITY, tailBidIDForOngoingSale);
         else if (msg.value == 0)                                          // Else, redeem all the non redeemed bids if no ETH was sent.
+            // This loop might exceed the gas limit if the contributor has too many bids. Bids can still be redeemed using the redeem function directly.
             for (uint i = 0; i < contributorBidIDs[msg.sender].length; ++i)
             {
                 uint bidID = contributorBidIDs[msg.sender][i];
@@ -273,7 +289,7 @@ contract ContinuousSale {
     /** @dev Get the number of ongoing subsale
      *  @return numberOfOngoingSubsale
      */
-    function getOngoingSubsaleNumber() view public returns (uint numberOfOngoingSubsale){
+    function getOngoingSubsaleNumber() public view returns (uint numberOfOngoingSubsale){
         numberOfOngoingSubsale = ((now - startTime) / secondsPerSubsale);
     }
 
@@ -315,7 +331,7 @@ contract ContinuousSale {
         return next;
     }
 
-    /** @dev Get the total contribution of an address. Doesn't count rejected bids.
+    /** @dev Get the total contribution for an address. Doesn't count rejected bids.
      *  This can be used for a KYC threshold.
      *  This function is O(n) where n is the amount of bids made by the contributor.
      *  This means that the contributor can make totalContrib(contributor) revert due to an out of gas error on purpose.
@@ -326,7 +342,7 @@ contract ContinuousSale {
         for (uint i = 0; i < contributorBidIDs[_contributor].length; ++i){
             uint bidID = contributorBidIDs[_contributor][i];
             Bid storage bid = bids[bidID];
-            uint cutOffBidID = cutOffBidIDs[bid.subsaleNumber];
+            uint cutOffBidID = cutOffBidIDForSubsales[bid.subsaleNumber];
             Bid storage cutOffBid = bids[cutOffBidID];
             if(finalized[bids[bidID].subsaleNumber]){ // The bid is finalized.
                 if(bid.maxValuation > cutOffBid.maxValuation || (bid.maxValuation == cutOffBid.maxValuation && bidID >= cutOffBidID)){ // Bid accepted.
