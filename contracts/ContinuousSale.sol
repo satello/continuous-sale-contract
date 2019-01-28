@@ -44,9 +44,9 @@ contract ContinuousSale {
         /* ***     Bid Members     *** */
         uint maxValuation;                      // Maximum valuation in wei beyond which the contributor prefers refund.
         uint contrib;                           // Contribution in wei.
-        address payable contributor;                    // The contributor who placed the bid.
+        address payable contributor;            // The contributor who placed the bid.
         bool redeemed;                          // True if the ether contribution reimbursed or tokens have been redeemed.
-        uint subsaleNumber;                     // Target subsale of the bid
+        uint subsaleNumber;                     // Target subsale of the bid.
     }
 
     uint public globalLastBidID;                          // Global bid ID counter, incremented when a new bid summitted.
@@ -56,21 +56,17 @@ contract ContinuousSale {
     /* *** Sale parameters *** */
     uint public numberOfSubsales;               // Number of subsales, first on index zero last on index numberOfSubsales-1
     uint public secondsPerSubsale;              // Duration per subsale in seconds.
-    uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch
+    uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch.
     ERC20 public token;                         // The token which will be sold.
     uint public tokensForSale;                  // Total amount of tokens for sale.
 
     /* *** Finalization variables *** */
-    bool[] public finalized;                                          // Is subsale finalized?
-    mapping(uint => uint) public cutOffBidIDForSubsales;              // Cutoff points for subsales.
-    mapping(uint => uint) public sumAcceptedContribs;                 // The sum of accepted contributions for a given subsale.
+    bool[] public finalized;                                 // Is subsale finalized?
+    mapping(uint => uint) public cutOffBidIDForSubsales;     // Cutoff points for subsales.
+    mapping(uint => uint) public sumAcceptedContribs;        // The sum of accepted contributions for a given subsale.
 
     /* *** Events *** */
     event BidSubmitted(uint subsaleNumber, uint bidID, uint time);
-    event FinalizationIteration(uint subsaleNumber, uint bidID, uint maxValuation);
-    event FinalizationStarted(uint subsaleNumber);
-    event FinalizationDone(uint subsaleNumber, uint cutOffBidID, uint raised, uint iterationCursor);
-    event Searching(uint subsaleNumber, uint next);
 
     /* *** Modifiers *** */
     modifier onlyOwner{require(owner == msg.sender, "Only the owner is authorized to execute this."); _;}
@@ -219,11 +215,9 @@ contract ContinuousSale {
         uint localCutOffBidID = cutOffBidIDForSubsales[_subsaleNumber];
         uint localSumAcceptedContrib = sumAcceptedContribs[_subsaleNumber];
 
-        emit FinalizationStarted(_subsaleNumber);
         // Search for the cut-off bid while adding the contributions.
         for (uint it = 0; it < _maxIt && !finalized[_subsaleNumber]; ++it) {
             Bid storage bid = bids[localCutOffBidID];
-            emit FinalizationIteration(_subsaleNumber, localCutOffBidID, bid.maxValuation);
             if (bid.contrib+localSumAcceptedContrib < bid.maxValuation) { // We haven't found the cut-off yet.
                 localSumAcceptedContrib += bid.contrib;
                 localCutOffBidID = bid.prev; // Go to the previous bid.
@@ -236,8 +230,6 @@ contract ContinuousSale {
                 bid.contrib = contribCutOff; // Update the contribution value.
                 localSumAcceptedContrib += bid.contrib;
                 beneficiary.send(localSumAcceptedContrib); // Use send in order to not block if the beneficiary's fallback reverts.
-
-                emit FinalizationDone(_subsaleNumber, localCutOffBidID, localSumAcceptedContrib, it);
             }
         }
 
