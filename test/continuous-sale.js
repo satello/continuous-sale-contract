@@ -26,16 +26,16 @@ contract('ContinuousSale', function(accounts) {
   const tokensToMint = new BN('12').mul(new BN('10').pow(new BN('25')))
   const uint256Max = new BN('2').pow(new BN('256')).sub(new BN('1'))
 
-  const START_TIME = Math.floor(Date.now() / 1000) // Unix epoch now
   const numberOfSubsales = 365
   const secondsPerSubsale = 86400
   const noCap = 120000000e18 // for placing bids with no cap
   testAccount = buyerE
 
+  let START_TIME
   let cs
-  let startTestTime
 
   beforeEach('initialize the contract', async function() {
+    START_TIME = Math.floor(Date.now() / 1000) // Unix epoch now
     cs = await ContinuousSale.new(
       beneficiary,
       numberOfSubsales,
@@ -224,12 +224,16 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e17
     }) // Bid 5.
 
+    assert.equal(await cs.finalized(0), false)
     await time.increase(secondsPerSubsale)
     await shouldFail.reverting(cs.finalize(uint256Max, 200, { from: buyerB }))
-    // assert(await cs.finalized[0])
+    await cs.finalize(30, 0)
+    assert.equal(await cs.finalized(0), true)
   })
 
   it('Should finalize in multiple runs', async () => {
+    assert.equal(await cs.finalized(0), false)
+
     const head = await cs.bids(0)
     const tailID = uint256Max
     const token = await MintableToken.new({ from: owner })
@@ -239,6 +243,10 @@ contract('ContinuousSale', function(accounts) {
     const Valuation1 = new BN('10').pow(new BN('20'))
     const Valuation2 = new BN('10').pow(new BN('19'))
     const Valuation3 = new BN('10').pow(new BN('18'))
+
+    const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
+    tailBidID = uint256Max.sub(ongoingSaleNumber)
+    console.log(ongoingSaleNumber)
 
     await shouldFail.reverting(
       cs.submitBidToOngoingSubsale(
@@ -250,51 +258,52 @@ contract('ContinuousSale', function(accounts) {
         }
       )
     ) // Should not work because the insertion position is incorrect
-    await cs.submitBidToOngoingSubsale(Valuation1, tailID, {
+    await cs.submitBidToOngoingSubsale(Valuation1, tailBidID, {
       from: buyerA,
       value: 0.1e18
     }) // Bid 1.
-    assert.equal(await cs.globalLastBidID(), 1)
-    const s = await cs.search(Valuation2, 0)
+    assert.equal(await cs.globalLastBidID(), 366)
+    const s = await cs.search(ongoingSaleNumber, Valuation2, 0)
     await shouldFail.reverting(
-      cs.submitBidToOngoingSubsale(Valuation2, tailID, {
+      cs.submitBidToOngoingSubsale(Valuation2, tailBidID, {
         from: buyerB,
         value: 0.1e18
       })
     ) // Should not work because not inserted in the right position.
 
-    await cs.submitBidToOngoingSubsale(Valuation2, 1, {
+    await cs.submitBidToOngoingSubsale(Valuation2, 366, {
       from: buyerB,
       value: 0.1e18
     }) // Bid 2.
-    await cs.submitBidToOngoingSubsale(Valuation3, 2, {
+    await cs.submitBidToOngoingSubsale(Valuation3, 367, {
       from: buyerC,
       value: 0.15e18
     }) // Bid 3.
     await shouldFail.reverting(
-      cs.submitBidToOngoingSubsale(Valuation2, 2, {
+      cs.submitBidToOngoingSubsale(Valuation2, 367, {
         from: buyerB,
         value: 0.25e18
       })
     ) // Should not work because not inserted in the right position.
-    await cs.submitBidToOngoingSubsale(Valuation2, 1, {
+    await cs.submitBidToOngoingSubsale(Valuation2, 366, {
       from: buyerB,
       value: 0.25e18
     }) // Bid 4
 
-    await cs.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+    await cs.searchAndBidToOngoingSubsale(Valuation2, tailBidID, {
       from: buyerE,
       value: 0.1e18
     }) // Bid 5.
 
     await time.increase(secondsPerSubsale)
 
-    await cs.finalize(2, 0, { from: buyerB })
-    assert.equal(await cs.finalizationTurn(), 0)
-    await cs.finalize(2, 0, { from: buyerC })
-    assert.equal(await cs.finalizationTurn(), 0)
-    await cs.finalize(30, 0, { from: buyerA })
-    assert.equal(await cs.finalizationTurn(), 1)
+    console.log(ongoingSaleNumber)
+    assert.equal(await cs.finalized(ongoingSaleNumber), false)
+    await cs.finalize(2, ongoingSaleNumber, { from: buyerB })
+    assert.equal(await cs.finalized(ongoingSaleNumber), false)
+    await cs.finalize(2, ongoingSaleNumber, { from: buyerC })
+    await cs.finalize(30, ongoingSaleNumber, { from: buyerA })
+    assert.equal(await cs.finalized(ongoingSaleNumber), true)
   })
 
   it('Should redeem', async function() {
@@ -309,27 +318,31 @@ contract('ContinuousSale', function(accounts) {
     const Valuation3 = new BN('10').pow(new BN('18'))
     const ValuationTooLow = new BN('10').pow(new BN('14'))
 
-    await cs.submitBidToOngoingSubsale(Valuation1, tailID, {
+    const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
+    tailBidID = uint256Max.sub(ongoingSaleNumber)
+
+    console.log(await cs.search(4, Valuation1, uint256Max))
+    await cs.submitBidToOngoingSubsale(Valuation1, tailBidID, {
       from: buyerA,
       value: 0.1e18
     }) // Bid 1.
-    await cs.submitBidToOngoingSubsale(Valuation2, 1, {
+    await cs.submitBidToOngoingSubsale(Valuation2, 366, {
       from: buyerB,
       value: 0.1e18
     }) // Bid 2.
-    await cs.submitBidToOngoingSubsale(Valuation3, 2, {
+    await cs.submitBidToOngoingSubsale(Valuation3, 367, {
       from: buyerC,
       value: 0.2e18
     }) // Bid 3.
-    await cs.submitBidToOngoingSubsale(Valuation2, 1, {
+    await cs.searchAndBidToOngoingSubsale(Valuation2, ongoingSaleNumber, {
       from: buyerD,
       value: 0.2e18
     }) // Bid 4
-    await cs.searchAndBidToOngoingSubsale(Valuation2, tailID, {
+    await cs.searchAndBidToOngoingSubsale(Valuation2, tailBidID, {
       from: buyerE,
       value: 0.1e18
     }) // Bid 5.
-    await cs.searchAndBidToOngoingSubsale(ValuationTooLow, tailID, {
+    await cs.searchAndBidToOngoingSubsale(ValuationTooLow, tailBidID, {
       from: buyerF,
       value: 0.1e18
     }) // Bid 6.
@@ -354,7 +367,7 @@ contract('ContinuousSale', function(accounts) {
         break
       }
 
-    for (let i = 1; i < 6; i++) {
+    for (let i = 366; i < 372; i++) {
       await cs.redeem(i, { from: owner })
       await shouldFail.reverting(cs.redeem(i, { from: owner }))
     }
@@ -447,9 +460,7 @@ contract('ContinuousSale', function(accounts) {
     )
 
     assert(
-      toBN(await token.balanceOf(buyerE)).eq(
-        tokensPerSubsale.div(new BN('7')).mul(new BN('1'))
-      ),
+      toBN(await token.balanceOf(buyerE)).eq(tokensPerSubsale.div(new BN('7'))),
       'The buyer E has not been given the right amount of tokens'
     )
 
@@ -497,15 +508,19 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 6.
 
+    const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
+
     const {
       valuation,
       currentCutOffBidID,
       currentCutOffBidMaxValuation,
       currentCutOffBidContrib
-    } = await cs.valuationAndCutOff()
+    } = await cs.valuationAndCutOff(ongoingSaleNumber)
+
+    console.log(currentCutOffBidID.toString())
 
     assert(valuation.eq(new BN('10').pow(new BN('17')).mul(new BN('5'))))
-    assert.equal(currentCutOffBidID, 6)
+    assert.equal(currentCutOffBidID, 371) // Last bid.
     assert(
       currentCutOffBidMaxValuation.eq(
         new BN('10').pow(new BN('17')).mul(new BN('5'))
@@ -610,14 +625,10 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 6.
 
-    await shouldFail.reverting(cs.finalize(uint256Max, 1))
+    await time.increase(secondsPerSubsale)
     await cs.finalize(uint256Max, 0) // Finalize day 0.
-    await time.increase(secondsPerSubsale)
     await cs.finalize(uint256Max, 1) // Finalize day 1.
-    await shouldFail.reverting(cs.finalize(uint256Max, 0))
-    await time.increase(secondsPerSubsale)
     await cs.finalize(uint256Max, 2) // Finalize day 1.
-    await shouldFail.reverting(cs.finalize(uint256Max, 1))
 
     assert(
       (await cs.totalContrib(buyerE)).eq(
@@ -636,6 +647,7 @@ contract('ContinuousSale', function(accounts) {
   })
 
   it('Should correctly finalize an empty subsale', async function() {
+    const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
     const head = await cs.bids(0)
     const tailID = uint256Max
     const token = await MintableToken.new({ from: owner })
@@ -644,9 +656,8 @@ contract('ContinuousSale', function(accounts) {
 
     await time.increase(secondsPerSubsale)
 
-    await shouldFail.reverting(cs.finalize(uint256Max, 1))
-    await cs.finalize(uint256Max, 0) // Finalize day 0.
-    assert(await cs.finalizationTurn(), 1)
+    await cs.finalize(uint256Max, ongoingSaleNumber) // Finalize day 0.
+    assert.equal(await cs.finalized(ongoingSaleNumber), true)
   })
 
   after('revert evm to first snapshot', async function() {
