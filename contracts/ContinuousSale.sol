@@ -281,16 +281,20 @@ contract ContinuousSale {
      *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
      *  Max valuation decreases from tail to head node.
      *  @param _maxValuation The maximum valuation given by the contributor. Or INFINITY if no maximum valuation is given.
-     *  @param _nextStart The bidID of the next bid from the initial position to start the search from.
+     *  @param _initialGuess The bidID of the next bid from the initial position to start the search from.
      *  @return nextInsert The bidID of the next bid from the position the bid must be inserted at.
      */
-    function search(uint _subsaleNumber, uint _maxValuation, uint _nextStart) view public returns(uint nextInsert){
+    function search(uint _subsaleNumber, uint _maxValuation, uint _initialGuess) public view returns(uint nextInsert){
         uint next;
-        if(bids[_nextStart].subsaleNumber != _subsaleNumber){ // Invalid first guess point.
+        if(bids[_initialGuess].subsaleNumber != _subsaleNumber){ // Invalid initial guess point. This node belongs to another linked-list.
             uint tailBidID = uint(-1) - _subsaleNumber;
+            if(bids[tailBidID].contributor == address(0)) { // This subsales artifical bids are not initialized yet.
+                return tailBidID; // It means there is no bids yet, and insertion point is tail.
+            }
             next = tailBidID; // Resetting to respective tail bid.
+
         } else {
-            next = _nextStart; // Valid first guess point.
+            next = _initialGuess; // Valid initial guess point. This node belongs to correct linked-list.
         }
 
         bool found;
