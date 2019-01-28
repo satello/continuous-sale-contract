@@ -15,7 +15,7 @@ import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 /** @title Continuous Sale Contract
  *  A continuous sale contract.
  *  There are multiple subsales.
- *  Each subsale is maintained by a doubly-linked-list with HEAD and TAIL artifical bids (to avoid null checks).
+ *  Each subsale is maintained by a sorted doubly-linked-list with HEAD and TAIL artifical bids (to avoid null checks).
  *  All the doubly-linked-lists are maintained in a single mapping.
  *  There is no bonus period and no widthdrawal period. Bids can either get accepted and redeemed or get refused and reimbursed.
  *  Bids should be submitted to correct spot into the respective linked-list, otherwise will be reverted.
@@ -32,8 +32,8 @@ contract ContinuousSale {
 
     uint public constant INFINITY = uint(-2);   // An astronomic number which is still less than uint(-1) which is the maxValuation of TAIL bids.
 
-    /** A bid to buy tokens as long as the personal maximum valuation and expiration deadline not expired.
-     *  For each subsale, bids are in a sorted doubly linked list.
+    /** A bid to buy tokens as long as the personal maximum valuation is not exceeded.
+     *  For each subsale, bids are stored in a sorted doubly linked list.
      *  They are sorted in ascending order by maxValuation.
      *  Each list contains two artificial bids, HEAD and TAIL having respectively, the minimum and maximum bidID and maxValuation.
      */
