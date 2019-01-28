@@ -87,7 +87,7 @@ contract ContinuousSale {
         startTime = _startTime;
 
         globalLastBidID = _numberOfSubsales; // Initialization. bidsIDs with less than _numberOfSubsales are reserved for HEAD bids.
-        finalized.length = _numberOfSubsales; // Initialize
+        finalized.length = _numberOfSubsales; // Initialization of the array.
     }
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
@@ -111,14 +111,14 @@ contract ContinuousSale {
         uint tailBidID = uint(-1) - _subsaleNumber;
         uint headBidID = _subsaleNumber;
 
-        if(bids[tailBidID].contributor == address(0)){ // Not initialized
+        if(bids[tailBidID].contributor == address(0)){ // Artifical bids are not initialized yet.
             bids[headBidID] = Bid({
                 prev: tailBidID,
                 next: tailBidID,
                 maxValuation: 0,
                 contrib: 0,
-                contributor: address(uint(-1)), // Mark as initialized with a non-default value
-                redeemed: true,                 // Mark as initialized with a non-default value
+                contributor: address(uint(-1)), // Mark as initialized with a non-default value.
+                redeemed: true,                 // Mark as initialized with a non-default value.
                 subsaleNumber: _subsaleNumber
             });
             bids[tailBidID] = Bid({
@@ -126,15 +126,15 @@ contract ContinuousSale {
                 next: headBidID,
                 maxValuation: uint(-1),
                 contrib: 0,
-                contributor: address(uint(-1)), // Mark as initialized with a non-default value
-                redeemed: true,                 // Mark as initialized with a non-default value
+                contributor: address(uint(-1)), // Mark as initialized with a non-default value.
+                redeemed: true,                 // Mark as initialized with a non-default value.
                 subsaleNumber: _subsaleNumber
             });
 
             cutOffBidIDForSubsales[_subsaleNumber] = tailBidID;
         }
 
-        require(_subsaleNumber < numberOfSubsales, "This subsale is non-existent.");
+        require(_subsaleNumber < numberOfSubsales, "This subsale is out of range.");
         require(now < startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale has ended.");
         require(bids[_nextBidID].subsaleNumber == _subsaleNumber, "This insertion point is inside another subsales linked-list thus it's an invalid insertion point. You can use search function to search for correct insertion points.");
 
@@ -167,7 +167,7 @@ contract ContinuousSale {
     }
 
     /** @dev Submit a bid to ongoing subsale. The caller must give the exact position the bid must be inserted into in the list.
-     *  In practice, use searchAndBid to avoid the position being incorrect due to a new bid being inserted and changing the position the bid must be inserted at.
+     *  In practice, use searchAndBidToOngoingSubsale to avoid the position being incorrect due to a new bid being inserted and changing the position the bid must be inserted at.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
      *  @param _next The bidID of the correct insertion spot in the linked-list.
      */
@@ -181,7 +181,7 @@ contract ContinuousSale {
      *  Using this function instead of calling submitBid directly prevents it from failing in the case where new bids are added before the transaction is executed.
      *  @param _subsaleNumber Target subsale of the bid.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
-     *  @param _next The bidID of the correct insertion spot in the linked-list.
+     *  @param _next The bidID of the correct insertion spot in the linked-list of given subsale.
      */
     function searchAndBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
         submitBid(_subsaleNumber, _maxValuation, search(_subsaleNumber, _maxValuation, _next));
@@ -192,7 +192,7 @@ contract ContinuousSale {
      *  The UI must first call search to find the best point to start the search such that it consumes the least amount of gas possible.
      *  Using this function instead of calling submitBid directly prevents it from failing in the case where new bids are added before the transaction is executed.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
-     *  @param _next The bidID of the correct insertion spot in the linked-list..
+     *  @param _next The bidID of the correct insertion spot in the linked-list of the ongoing subsale.
      */
     function searchAndBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
         uint ongoingSubsaleNumber = getOngoingSubsaleNumber();
@@ -204,11 +204,11 @@ contract ContinuousSale {
      *  The function is O(min(n,_maxIt)) where n is the amount of bids. In total it will perform O(n) computations, possibly in multiple calls.
      *  Each call has only a constant amount of storage write operations.
      *  @param _maxIt The maximum amount of bids to go through. This value must be set in order to not exceed the gas limit.
-     *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be due before calling this. Also all previous subsales should be finalized.
+     *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be ended before calling this.
      */
     function finalize(uint _maxIt, uint _subsaleNumber) public {
         require(_subsaleNumber < numberOfSubsales, "This subsale is out of range.");
-        require(now >= startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale is not expired yet.");
+        require(now >= startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale is not ended yet.");
         require(!finalized[_subsaleNumber], "This subsale is already finalized.");
 
         // Make local copies of the finalization variables in order to avoid modifying storage in order to save gas.
@@ -278,7 +278,7 @@ contract ContinuousSale {
 
     /* *** View Functions *** */
 
-    /** @dev Get the number of ongoing subsale
+    /** @dev Get the number of ongoing subsale.
      *  @return numberOfOngoingSubsale
      */
     function getOngoingSubsaleNumber() public view returns (uint numberOfOngoingSubsale){
@@ -288,9 +288,10 @@ contract ContinuousSale {
     /** @dev Search for the correct insertion spot of a bid.
      *  This function is O(n), where n is the amount of bids between the initial search position and the insertion position.
      *  Max valuation decreases from tail to head node.
+     *  @param _subsaleNumber The number of subsale to look for an insertion point.
      *  @param _maxValuation The maximum valuation given by the contributor. Or INFINITY if no maximum valuation is given.
      *  @param _initialGuess The bidID of the next bid from the initial position to start the search from.
-     *  @return nextInsert The bidID of the next bid from the position the bid must be inserted at.
+     *  @return nextInsert The bidID of the next bid from the position the bid must be inserted at the linked-list of given subsale.
      */
     function search(uint _subsaleNumber, uint _maxValuation, uint _initialGuess) public view returns(uint nextInsert){
         uint next;
