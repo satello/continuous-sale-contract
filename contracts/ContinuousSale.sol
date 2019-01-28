@@ -13,7 +13,9 @@ pragma solidity ^0.5.3;
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 
 /** @title Continuous Sale Contract
- *  TODO
+ *  A continuous sale contract.
+ *  There are multiple subsales.
+ *  Each subsale is maintained by a doubly-linked-list with HEAD and TAIL artifical bids (to avoid null checks)
  */
 contract ContinuousSale {
 
