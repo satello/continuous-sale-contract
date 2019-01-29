@@ -21,7 +21,7 @@ import "./ContinuousSale.sol";
  *  Bids should be submitted to correct spot into the respective linked-list, otherwise will be reverted.
  *  Search function can help locating correct insertion spot.
  *  Providing a better first guess to search function reduces the amount of iteration needed for searching correct spot.
- *  Bidder can use searchAndBid and searchAndBidToOngoingSubsale functions to bid without proving the correct spot, with a gas cost for search function.
+ *  Bidder can use searchAndBid and searchAndBidToOngoingSubsale functions to bid without providing the correct spot, with a gas cost for search function.
  *  To avoid searching costs, first, call search function and obtain correct spot, then submitBid using the correct spot.
  */
 contract LevelWhitelistedContinuousSale is ContinuousSale {
