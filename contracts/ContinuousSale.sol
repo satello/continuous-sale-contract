@@ -87,14 +87,14 @@ contract ContinuousSale {
         startTime = _startTime;
 
         globalLastBidID = _numberOfSubsales; // Initialization. bidsIDs with less than _numberOfSubsales are reserved for HEAD bids.
-        finalized.length = _numberOfSubsales + 1; // Initialization of the array.
+        finalized.length = _numberOfSubsales + 1; // Initialization of the array. Note that index zero is unused.
     }
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
      *  @param _token The token to be sold.
      */
     function setToken(ERC20 _token) public onlyOwner {
-        require(address(token) == address(0), "Token address has been set already.");         // Make sure the token is not already set.
+        require(address(token) == address(0), "Token address has been set already.");                  // Make sure the token is not already set.
         require(_token.balanceOf(address(this)) > 0, "Token balance owned by this contract is zero."); // Make sure the contract received the balance.
 
         token = _token;
@@ -182,7 +182,7 @@ contract ContinuousSale {
      *  Using this function instead of calling submitBid directly prevents it from failing in the case where new bids are added before the transaction is executed.
      *  @param _subsaleNumber Target subsale of the bid.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
-     *  @param _next The bidID of the correct insertion spot in the linked-list of given subsale.
+     *  @param _next The bidID of the initial guess for insertion spot in the linked-list of given subsale.
      */
     function searchAndBid(uint _subsaleNumber, uint _maxValuation, uint _next) public payable {
         submitBid(_subsaleNumber, _maxValuation, search(_subsaleNumber, _maxValuation, _next));
@@ -193,7 +193,7 @@ contract ContinuousSale {
      *  The UI must first call search to find the best point to start the search such that it consumes the least amount of gas possible.
      *  Using this function instead of calling submitBid directly prevents it from failing in the case where new bids are added before the transaction is executed.
      *  @param _maxValuation The maximum valuation given by the contributor. If the amount raised is higher, the bid is cancelled and the contributor refunded because it prefers a refund instead of this level of dilution. To buy no matter what, use INFINITY.
-     *  @param _next The bidID of the correct insertion spot in the linked-list of the ongoing subsale.
+     *  @param _next The bidID of the initial guess for insertion spot in the linked-list of given subsale.
      */
     function searchAndBidToOngoingSubsale(uint _maxValuation, uint _next) public payable {
         uint ongoingSubsaleNumber = getOngoingSubsaleNumber();
@@ -280,7 +280,7 @@ contract ContinuousSale {
     /* *** View Functions *** */
 
     /** @dev Get the number of ongoing subsale.
-     *  Note: Minimum subsale number is 1
+     *  Note: Minimum subsale number is 1.
      *  @return numberOfOngoingSubsale
      */
     function getOngoingSubsaleNumber() public view returns (uint){
