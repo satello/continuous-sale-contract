@@ -61,7 +61,7 @@ contract ContinuousSale {
     uint public tokensForSale;                  // Total amount of tokens for sale.
 
     /* *** Finalization variables *** */
-    bool[] public finalized;                                 // Is subsale finalized?
+    bool[] public finalized;                                 // Is subsale finalized? Note that index zero is unused.
     mapping(uint => uint) public cutOffBidIDForSubsales;     // Cutoff points for subsales.
     mapping(uint => uint) public sumAcceptedContribs;        // The sum of accepted contributions for a given subsale.
 
