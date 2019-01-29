@@ -54,7 +54,7 @@ contract ContinuousSale {
     mapping (uint => Bid) public bids;                    // Map bidID to bid.
 
     /* *** Sale parameters *** */
-    uint public numberOfSubsales;               // Number of subsales, first on index one last on index numberOfSubsales
+    uint public numberOfSubsales;               // Number of subsales, first on index one last on index numberOfSubsales, [1, numberOfSubsales].
     uint public secondsPerSubsale;              // Duration per subsale in seconds.
     uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch.
     ERC20 public token;                         // The token which will be sold.
