@@ -112,7 +112,6 @@ contract('ContinuousSale', function(accounts) {
     ) // Should not work because the insertion position is incorrect
 
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
-    console.log(ongoingSaleNumber.toString())
     const tailBidID = uint256Max.sub(ongoingSaleNumber)
     headBidID = ongoingSaleNumber
     await cs.submitBidToOngoingSubsale(Valuation1, tailBidID, {
@@ -128,7 +127,6 @@ contract('ContinuousSale', function(accounts) {
       })
     ) // Should not work because not inserted in the right position.
 
-    console.log((await cs.getOngoingSubsaleNumber()).toString())
     await cs.submitBidToOngoingSubsale(Valuation2, globalLastBidID, {
       from: buyerB,
       value: 0.1e18
@@ -167,8 +165,6 @@ contract('ContinuousSale', function(accounts) {
     const Valuation3 = new BN('10').pow(new BN('16'))
 
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
-    console.log('ongoingsalenumber')
-    console.log(ongoingSaleNumber.toString())
     tailBidID = uint256Max.sub(ongoingSaleNumber)
     headBidID = ongoingSaleNumber
 
@@ -238,7 +234,6 @@ contract('ContinuousSale', function(accounts) {
 
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
     tailBidID = uint256Max.sub(ongoingSaleNumber)
-    console.log(ongoingSaleNumber)
 
     await shouldFail.reverting(
       cs.submitBidToOngoingSubsale(
@@ -288,7 +283,6 @@ contract('ContinuousSale', function(accounts) {
 
     await time.increase(secondsPerSubsale)
 
-    console.log(ongoingSaleNumber)
     assert.equal(await cs.finalized(ongoingSaleNumber), false)
     await cs.finalize(2, ongoingSaleNumber, { from: buyerB })
     assert.equal(await cs.finalized(ongoingSaleNumber), false)
@@ -308,10 +302,8 @@ contract('ContinuousSale', function(accounts) {
     const ValuationTooLow = new BN('10').pow(new BN('14'))
 
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
-    console.log(ongoingSaleNumber.toString())
     tailBidID = uint256Max.sub(ongoingSaleNumber)
 
-    console.log(await cs.search(4, Valuation1, uint256Max))
     await cs.submitBidToOngoingSubsale(Valuation1, tailBidID, {
       from: buyerA,
       value: 0.1e18
@@ -359,8 +351,6 @@ contract('ContinuousSale', function(accounts) {
       await cs.redeem(i, { from: owner })
       await shouldFail.reverting(cs.redeem(i, { from: owner })) // Duplicate redeem calls should fail.
     }
-
-    console.log((await cs.getOngoingSubsaleNumber()).toString())
 
     const redeemTxUsingFallback = await cs.sendTransaction({
       from: buyerF,
@@ -502,8 +492,6 @@ contract('ContinuousSale', function(accounts) {
       currentCutOffBidMaxValuation,
       valuation
     } = await cs.valuationAndCutOff(ongoingSaleNumber)
-
-    console.log(currentCutOffBidID.toString())
 
     assert(valuation.eq(new BN('10').pow(new BN('17')).mul(new BN('5'))))
     assert.equal(currentCutOffBidID, 371) // Last bid.
