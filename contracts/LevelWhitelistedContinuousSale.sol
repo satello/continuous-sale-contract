@@ -30,7 +30,7 @@ contract LevelWhitelistedContinuousSale is ContinuousSale {
     mapping (address => bool) public reinforcedWhitelist; // True if in the reinforced whitelist (does not have a contribution limit).
     address public whitelister; // The party which can add or remove people from the whitelist.
 
-    modifier onlyWhitelister{ require(whitelister == msg.sender, "Only the whitelister is authorized to execute this."); _; }
+    modifier onlyWhitelister{require(whitelister == msg.sender, "Only the whitelister is authorized to execute this."); _;}
 
     /** @dev Constructor. First contract set up (tokens will also need to be transferred to the contract
      *  and then setToken needs to be called to finish the setup).
@@ -59,38 +59,38 @@ contract LevelWhitelistedContinuousSale is ContinuousSale {
      *  @param _whitelister The whitelister.
      */
     function setWhitelister(address _whitelister) public onlyOwner {
-        whitelister=_whitelister;
+        whitelister = _whitelister;
     }
 
     /** @dev Add buyers to the base whitelist.
      *  @param _buyersToWhitelist Buyers to add to the whitelist.
      */
     function addBaseWhitelist(address[] memory _buyersToWhitelist) public onlyWhitelister {
-        for(uint i=0;i<_buyersToWhitelist.length;++i)
-            baseWhitelist[_buyersToWhitelist[i]]=true;
+        for(uint i = 0; i < _buyersToWhitelist.length; ++i)
+            baseWhitelist[_buyersToWhitelist[i]] = true;
     }
 
     /** @dev Add buyers to the reinforced whitelist.
      *  @param _buyersToWhitelist Buyers to add to the whitelist.
      */
     function addReinforcedWhitelist(address[] memory _buyersToWhitelist) public onlyWhitelister {
-        for(uint i=0;i<_buyersToWhitelist.length;++i)
-            reinforcedWhitelist[_buyersToWhitelist[i]]=true;
+        for(uint i = 0; i < _buyersToWhitelist.length; ++i)
+            reinforcedWhitelist[_buyersToWhitelist[i]] = true;
     }
 
     /** @dev Remove buyers from the base whitelist.
      *  @param _buyersToRemove Buyers to remove from the whitelist.
      */
     function removeBaseWhitelist(address[] memory _buyersToRemove) public onlyWhitelister {
-        for(uint i=0;i<_buyersToRemove.length;++i)
-            baseWhitelist[_buyersToRemove[i]]=false;
+        for(uint i = 0; i < _buyersToRemove.length; ++i)
+            baseWhitelist[_buyersToRemove[i]] = false;
     }
 
     /** @dev Remove buyers from the reinforced whitelist.
      *  @param _buyersToRemove Buyers to remove from the whitelist.
      */
     function removeReinforcedWhitelist(address[] memory _buyersToRemove) public onlyWhitelister {
-        for(uint i=0;i<_buyersToRemove.length;++i)
-            reinforcedWhitelist[_buyersToRemove[i]]=false;
+        for(uint i = 0; i < _buyersToRemove.length; ++i)
+            reinforcedWhitelist[_buyersToRemove[i]] = false;
     }
 }
