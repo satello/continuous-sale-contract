@@ -1,8 +1,8 @@
 /* eslint-disable no-undef */ // Avoid the linter considering truffle elements as undef.
 const pify = require('pify')
 const {
-  time,
-  shouldFail
+  shouldFail,
+  time
 } = require('openzeppelin-test-helpers/openzeppelin-test-helpers')
 
 const MintableToken = artifacts.require(
@@ -22,13 +22,12 @@ contract('ContinuousSale', function(accounts) {
   const buyerD = accounts[5]
   const buyerE = accounts[6]
   const buyerF = accounts[7]
-  const GAS_PRICE = 5e9
+  const GAS_PRICE = 1
   const tokensToMint = new BN('12').mul(new BN('10').pow(new BN('25')))
   const uint256Max = new BN('2').pow(new BN('256')).sub(new BN('1'))
 
   const numberOfSubsales = 365
   const secondsPerSubsale = 86400
-  const noCap = 120000000e18 // for placing bids with no cap
   testAccount = buyerE
 
   let START_TIME
@@ -93,8 +92,6 @@ contract('ContinuousSale', function(accounts) {
 
   // submitBidToOngoingSubsale
   it('Should submit only valid bids', async () => {
-    const head = await cs.bids(0)
-    let tailBidID
     const token = await MintableToken.new({ from: owner })
     await token.mint(cs.address, tokensToMint, { from: owner })
     await cs.setToken(token.address, { from: owner })
@@ -116,7 +113,7 @@ contract('ContinuousSale', function(accounts) {
 
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
     console.log(ongoingSaleNumber.toString())
-    tailBidID = uint256Max.sub(ongoingSaleNumber)
+    const tailBidID = uint256Max.sub(ongoingSaleNumber)
     headBidID = ongoingSaleNumber
     await cs.submitBidToOngoingSubsale(Valuation1, tailBidID, {
       from: buyerA,
@@ -124,7 +121,6 @@ contract('ContinuousSale', function(accounts) {
     }) // Bid 1.
     globalLastBidID = await cs.globalLastBidID()
     assert.equal(globalLastBidID, 366)
-    const s = await cs.search(ongoingSaleNumber, Valuation2, 0)
     await shouldFail.reverting(
       cs.submitBidToOngoingSubsale(Valuation2, tailBidID, {
         from: buyerB,
@@ -160,9 +156,7 @@ contract('ContinuousSale', function(accounts) {
     await cs.sendTransaction({ from: buyerF, value: 0.3e18 }) // Bid 6.
   })
 
-  // searchAndBidToOngoingSubsale
   it('Should finalize in single run', async () => {
-    const head = await cs.bids(0)
     let tailBidID = uint256Max
     const token = await MintableToken.new({ from: owner })
     await token.mint(cs.address, tokensToMint, { from: owner })
@@ -173,6 +167,7 @@ contract('ContinuousSale', function(accounts) {
     const Valuation3 = new BN('10').pow(new BN('16'))
 
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
+    console.log('ongoingsalenumber')
     console.log(ongoingSaleNumber.toString())
     tailBidID = uint256Max.sub(ongoingSaleNumber)
     headBidID = ongoingSaleNumber
@@ -192,7 +187,6 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 1.
     assert.equal(await cs.globalLastBidID(), 366)
-    const s = await cs.search(ongoingSaleNumber, Valuation2, 0)
     await shouldFail.reverting(
       cs.submitBidToOngoingSubsale(Valuation2, tailBidID, {
         from: buyerB,
@@ -224,18 +218,16 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e17
     }) // Bid 5.
 
-    assert.equal(await cs.finalized(0), false)
+    assert.equal(await cs.finalized(1), false)
     await time.increase(secondsPerSubsale)
     await shouldFail.reverting(cs.finalize(uint256Max, 200, { from: buyerB }))
-    await cs.finalize(30, 0)
-    assert.equal(await cs.finalized(0), true)
+    await cs.finalize(30, 1)
+    assert.equal(await cs.finalized(1), true)
   })
 
   it('Should finalize in multiple runs', async () => {
     assert.equal(await cs.finalized(0), false)
 
-    const head = await cs.bids(0)
-    const tailID = uint256Max
     const token = await MintableToken.new({ from: owner })
     await token.mint(cs.address, tokensToMint, { from: owner })
     await cs.setToken(token.address, { from: owner })
@@ -263,7 +255,6 @@ contract('ContinuousSale', function(accounts) {
       value: 0.1e18
     }) // Bid 1.
     assert.equal(await cs.globalLastBidID(), 366)
-    const s = await cs.search(ongoingSaleNumber, Valuation2, 0)
     await shouldFail.reverting(
       cs.submitBidToOngoingSubsale(Valuation2, tailBidID, {
         from: buyerB,
@@ -307,8 +298,6 @@ contract('ContinuousSale', function(accounts) {
   })
 
   it('Should redeem', async function() {
-    const head = await cs.bids(0)
-    const tailID = uint256Max
     const token = await MintableToken.new({ from: owner })
     await token.mint(cs.address, tokensToMint, { from: owner })
     await cs.setToken(token.address, { from: owner })
@@ -319,6 +308,7 @@ contract('ContinuousSale', function(accounts) {
     const ValuationTooLow = new BN('10').pow(new BN('14'))
 
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
+    console.log(ongoingSaleNumber.toString())
     tailBidID = uint256Max.sub(ongoingSaleNumber)
 
     console.log(await cs.search(4, Valuation1, uint256Max))
@@ -342,11 +332,13 @@ contract('ContinuousSale', function(accounts) {
       from: buyerE,
       value: 0.1e18
     }) // Bid 5.
+
     await cs.searchAndBidToOngoingSubsale(ValuationTooLow, tailBidID, {
       from: buyerF,
       value: 0.1e18
     }) // Bid 6.
 
+    const latestSubsaleNumber = (await cs.getOngoingSubsaleNumber()).toString()
     await time.increase(secondsPerSubsale)
 
     const buyerABalanceBeforeRedeem = await web3.eth.getBalance(buyerA)
@@ -359,24 +351,21 @@ contract('ContinuousSale', function(accounts) {
       beneficiary
     )
 
-    let finalizationCounter = 0
-    while (true)
-      try {
-        await cs.finalize(uint256Max, finalizationCounter++, { from: owner })
-      } catch (e) {
-        break
-      }
+    let finalizationCounter = 1
+    for (let i = 1; i <= latestSubsaleNumber; i++)
+      await cs.finalize(uint256Max, finalizationCounter++, { from: owner })
 
-    for (let i = 366; i < 372; i++) {
+    for (let i = 366; i < 371; i++) {
       await cs.redeem(i, { from: owner })
-      await shouldFail.reverting(cs.redeem(i, { from: owner }))
+      await shouldFail.reverting(cs.redeem(i, { from: owner })) // Duplicate redeem calls should fail.
     }
 
-    const gasPrice = 1
+    console.log((await cs.getOngoingSubsaleNumber()).toString())
+
     const redeemTxUsingFallback = await cs.sendTransaction({
       from: buyerF,
-      value: 0,
-      gasPrice: gasPrice
+      gasPrice: GAS_PRICE,
+      value: 0
     }) // Redeem using fallback
 
     // Verify the proper amounts of ETH are refunded.
@@ -413,7 +402,7 @@ contract('ContinuousSale', function(accounts) {
             .pow(new BN('17'))
             .sub(
               new BN(redeemTxUsingFallback.receipt.gasUsed).mul(
-                new BN(gasPrice)
+                new BN(GAS_PRICE)
               )
             )
         )
@@ -421,7 +410,7 @@ contract('ContinuousSale', function(accounts) {
       'The buyer F has not been reimbursed as it should'
     )
 
-    const balance = new web3.utils.toBN(await web3.eth.getBalance(beneficiary))
+    const balance = web3.utils.toBN(await web3.eth.getBalance(beneficiary))
     const difference = new BN('7').mul(new BN('10').pow(new BN('17')))
 
     assert(
@@ -471,7 +460,6 @@ contract('ContinuousSale', function(accounts) {
   })
 
   it('Should correctly show current valuation and cut off', async function() {
-    const head = await cs.bids(0)
     const tailID = uint256Max
     const token = await MintableToken.new({ from: owner })
     await token.mint(cs.address, tokensToMint, { from: owner })
@@ -479,9 +467,7 @@ contract('ContinuousSale', function(accounts) {
 
     const Valuation1 = new BN('10').pow(new BN('18'))
     const Valuation2 = new BN('10').pow(new BN('18'))
-    const Valuation3 = new BN('10').pow(new BN('18'))
     const Valuation4 = new BN('10').pow(new BN('18')).div(new BN('2'))
-    const Valuation5 = new BN('10').pow(new BN('18'))
 
     await cs.searchAndBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
@@ -511,10 +497,10 @@ contract('ContinuousSale', function(accounts) {
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
 
     const {
-      valuation,
+      currentCutOffBidContrib,
       currentCutOffBidID,
       currentCutOffBidMaxValuation,
-      currentCutOffBidContrib
+      valuation
     } = await cs.valuationAndCutOff(ongoingSaleNumber)
 
     console.log(currentCutOffBidID.toString())
@@ -534,7 +520,6 @@ contract('ContinuousSale', function(accounts) {
   })
 
   it('Should correctly finalize a multiple subsale case and show total conribution correctly', async function() {
-    const head = await cs.bids(0)
     const tailID = uint256Max
     const token = await MintableToken.new({ from: owner })
     await token.mint(cs.address, tokensToMint, { from: owner })
@@ -542,9 +527,7 @@ contract('ContinuousSale', function(accounts) {
 
     const Valuation1 = new BN('10').pow(new BN('18'))
     const Valuation2 = new BN('10').pow(new BN('18'))
-    const Valuation3 = new BN('10').pow(new BN('18'))
     const Valuation4 = new BN('10').pow(new BN('18')).div(new BN('2'))
-    const Valuation5 = new BN('10').pow(new BN('18'))
 
     await cs.searchAndBidToOngoingSubsale(Valuation1, tailID, {
       from: buyerA,
@@ -626,9 +609,8 @@ contract('ContinuousSale', function(accounts) {
     }) // Bid 6.
 
     await time.increase(secondsPerSubsale)
-    await cs.finalize(uint256Max, 0) // Finalize day 0.
     await cs.finalize(uint256Max, 1) // Finalize day 1.
-    await cs.finalize(uint256Max, 2) // Finalize day 1.
+    await cs.finalize(uint256Max, 2) // Finalize day 2.
 
     assert(
       (await cs.totalContrib(buyerE)).eq(
@@ -648,15 +630,13 @@ contract('ContinuousSale', function(accounts) {
 
   it('Should correctly finalize an empty subsale', async function() {
     const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
-    const head = await cs.bids(0)
-    const tailID = uint256Max
     const token = await MintableToken.new({ from: owner })
     await token.mint(cs.address, tokensToMint, { from: owner })
     await cs.setToken(token.address, { from: owner })
 
     await time.increase(secondsPerSubsale)
 
-    await cs.finalize(uint256Max, ongoingSaleNumber) // Finalize day 0.
+    await cs.finalize(uint256Max, ongoingSaleNumber) // Finalize day 1.
     assert.equal(await cs.finalized(ongoingSaleNumber), true)
   })
 

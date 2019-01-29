@@ -54,7 +54,7 @@ contract ContinuousSale {
     mapping (uint => Bid) public bids;                    // Map bidID to bid.
 
     /* *** Sale parameters *** */
-    uint public numberOfSubsales;               // Number of subsales, first on index zero last on index numberOfSubsales-1
+    uint public numberOfSubsales;               // Number of subsales, first on index one last on index numberOfSubsales
     uint public secondsPerSubsale;              // Duration per subsale in seconds.
     uint public startTime;                      // Starting time of the sale in seconds, UNIX epoch.
     ERC20 public token;                         // The token which will be sold.
@@ -87,7 +87,7 @@ contract ContinuousSale {
         startTime = _startTime;
 
         globalLastBidID = _numberOfSubsales; // Initialization. bidsIDs with less than _numberOfSubsales are reserved for HEAD bids.
-        finalized.length = _numberOfSubsales; // Initialization of the array.
+        finalized.length = _numberOfSubsales + 1; // Initialization of the array.
     }
 
     /** @dev Set the token. Must only be called after the contract receives the tokens to be sold.
@@ -108,6 +108,8 @@ contract ContinuousSale {
      *  @param _nextBidID The bidID of the next bid in the list.
      */
     function submitBid(uint _subsaleNumber, uint _maxValuation, uint _nextBidID) public payable {
+        require(_subsaleNumber <= numberOfSubsales && _subsaleNumber >= 1, "This subsale is out of range.");
+
         uint tailBidID = uint(-1) - _subsaleNumber;
         uint headBidID = _subsaleNumber;
 
@@ -134,8 +136,7 @@ contract ContinuousSale {
             cutOffBidIDForSubsales[_subsaleNumber] = tailBidID;
         }
 
-        require(_subsaleNumber < numberOfSubsales, "This subsale is out of range.");
-        require(now < startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale has ended.");
+        require(now < startTime + (_subsaleNumber * secondsPerSubsale), "This subsale has ended.");
         require(bids[_nextBidID].subsaleNumber == _subsaleNumber, "This insertion point is inside another subsales linked-list thus it's an invalid insertion point. You can use search function to search for correct insertion points.");
 
         Bid storage nextBid = bids[_nextBidID];
@@ -207,8 +208,8 @@ contract ContinuousSale {
      *  @param _subsaleNumber Number of the subsale to finalize. Subsale should be ended before calling this.
      */
     function finalize(uint _maxIt, uint _subsaleNumber) public {
-        require(_subsaleNumber < numberOfSubsales, "This subsale is out of range.");
-        require(now >= startTime + (_subsaleNumber * secondsPerSubsale) + secondsPerSubsale, "This subsale is not ended yet.");
+        require(_subsaleNumber <= numberOfSubsales && _subsaleNumber >= 1, "This subsale is out of range.");
+        require(now >= startTime + (_subsaleNumber * secondsPerSubsale), "This subsale is not ended yet.");
         require(!finalized[_subsaleNumber], "This subsale is already finalized.");
 
         // Make local copies of the finalization variables in order to avoid modifying storage in order to save gas.
@@ -279,10 +280,12 @@ contract ContinuousSale {
     /* *** View Functions *** */
 
     /** @dev Get the number of ongoing subsale.
+     *  Note: Minimum subsale number is 1
      *  @return numberOfOngoingSubsale
      */
-    function getOngoingSubsaleNumber() public view returns (uint numberOfOngoingSubsale){
-        numberOfOngoingSubsale = ((now - startTime) / secondsPerSubsale);
+    function getOngoingSubsaleNumber() public view returns (uint){
+        uint numberOfOngoingSubsale = ((now - startTime) / secondsPerSubsale) + 1;
+        return numberOfOngoingSubsale <= numberOfSubsales ? numberOfOngoingSubsale : uint(-1); // If the continuous sale is ended return uint(-1)
     }
 
     /** @dev Search for the correct insertion spot of a bid.
