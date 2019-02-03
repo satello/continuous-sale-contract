@@ -30,6 +30,8 @@ contract('ContinuousSale', function(accounts) {
   const secondsPerSubsale = 86400
   testAccount = buyerE
 
+  const tokensPerSubsale = tokensToMint.div(new BN(numberOfSubsales))
+
   let START_TIME
   let cs
 
@@ -410,8 +412,6 @@ contract('ContinuousSale', function(accounts) {
       'The beneficiary has not been paid correctly'
     )
 
-    const tokensPerSubsale = tokensToMint.div(new BN(numberOfSubsales))
-
     assert(
       toBN(await token.balanceOf(buyerA)).eq(tokensPerSubsale.div(new BN('7'))),
       'The buyer A has not been given the right amount of tokens'
@@ -624,15 +624,37 @@ contract('ContinuousSale', function(accounts) {
 
     await time.increase(secondsPerSubsale)
 
-    await cs.finalize(uint256Max, ongoingSaleNumber) // Finalize day 1.
+    await cs.finalize(uint256Max, ongoingSaleNumber)
     assert.equal(await cs.finalized(ongoingSaleNumber), true)
   })
 
-  after('revert evm to first snapshot', async function() {
-    await pify(web3.currentProvider.send)({
-      jsonrpc: '2.0',
-      method: 'evm_revert',
-      params: 1
-    })
+  it('Should correctly finalize a subsale with only one bid and redeem it', async function() {
+    const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
+    const token = await MintableToken.new({ from: owner })
+    await token.mint(cs.address, tokensToMint, { from: owner })
+    await cs.setToken(token.address, { from: owner })
+    const Valuation1 = new BN('10').pow(new BN('18'))
+
+    await cs.searchAndBidToOngoingSubsale(Valuation1, uint256Max, {
+      from: buyerA,
+      value: 0.1e18
+    }) // Bid 1.
+
+    const bidID = await cs.globalLastBidID()
+    await time.increase(secondsPerSubsale)
+
+    await cs.finalize(uint256Max, ongoingSaleNumber)
+    assert.equal(await cs.finalized(ongoingSaleNumber), true)
+    await cs.redeem(bidID)
+    assert.equal((await cs.bids(bidID))[5], true) // Assert redeemed
+    assert((await token.balanceOf(buyerA)).eq(tokensPerSubsale)) // Assert all tokens are redeemed to this account as there is no other bid.
   })
+
+  // after('revert evm to first snapshot', async function() {
+  //   await pify(web3.currentProvider.send)({
+  //     jsonrpc: '2.0',
+  //     method: 'evm_revert',
+  //     params: 1
+  //   })
+  // })
 })
