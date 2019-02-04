@@ -380,4 +380,13 @@ contract ContinuousSale {
 
         currentCutOffBidMaxValuation = bids[currentCutOffBidID].maxValuation;
     }
+
+    function getBidIdsForContributor(address _contributorAddress, bool _oldestFirst) external view returns (uint[] memory _bidIds) {
+      uint numberOfBids = contributorBidIDs[_contributorAddress].length;
+      _bidIds = new uint[](numberOfBids);
+
+      for (uint i = 0; i < numberOfBids; i++) {
+        _bidIds[i] = contributorBidIDs[_contributorAddress][_oldestFirst ? i : numberOfBids - i - 1];
+      }
+    }
 }
