@@ -385,13 +385,13 @@ contract ContinuousSale {
      *  @param _contributorAddress Address of the contributor to retrieve bids of.
      *  @param _oldestFirst Flag to arrange the order either ascending or descending, in returned array.
      *  @return _bidIds Array of bid ids belong to given contributor.
-     */ 
+     */
     function getBidIdsForContributor(address _contributorAddress, bool _oldestFirst) external view returns (uint[] memory _bidIds) {
-      uint numberOfBids = contributorBidIDs[_contributorAddress].length;
-      _bidIds = new uint[](numberOfBids);
+        uint numberOfBids = contributorBidIDs[_contributorAddress].length;
+        _bidIds = new uint[](numberOfBids);
 
-      for (uint i = 0; i < numberOfBids; i++) {
-        _bidIds[i] = contributorBidIDs[_contributorAddress][_oldestFirst ? i : numberOfBids - i - 1];
-      }
+        for (uint i = 0; i < numberOfBids; i++) {
+            _bidIds[i] = contributorBidIDs[_contributorAddress][_oldestFirst ? i : numberOfBids - i - 1];
+        }
     }
 }
