@@ -650,6 +650,55 @@ contract('ContinuousSale', function(accounts) {
     assert((await token.balanceOf(buyerA)).eq(tokensPerSubsale)) // Assert all tokens are redeemed to this account as there is no other bid.
   })
 
+  it.only('Should correctly get bid ids of a given contributor', async function() {
+    const token = await MintableToken.new({ from: owner })
+    await token.mint(cs.address, tokensToMint, { from: owner })
+    await cs.setToken(token.address, { from: owner })
+
+    const Valuation1 = new BN('10').pow(new BN('20'))
+    const Valuation2 = new BN('10').pow(new BN('19'))
+    const Valuation3 = new BN('10').pow(new BN('18'))
+    const ValuationTooLow = new BN('10').pow(new BN('14'))
+
+    const ongoingSaleNumber = await cs.getOngoingSubsaleNumber()
+    tailBidID = uint256Max.sub(ongoingSaleNumber)
+
+    await cs.submitBidToOngoingSubsale(Valuation1, tailBidID, {
+      from: buyerA,
+      value: 0.1e18
+    }) // Bid 1.
+    await cs.submitBidToOngoingSubsale(Valuation2, 366, {
+      from: buyerA,
+      value: 0.1e18
+    }) // Bid 2.
+    await cs.submitBidToOngoingSubsale(Valuation3, 367, {
+      from: buyerB,
+      value: 0.2e18
+    }) // Bid 3.
+    await cs.searchAndBidToOngoingSubsale(Valuation2, ongoingSaleNumber, {
+      from: buyerA,
+      value: 0.2e18
+    }) // Bid 4
+    await cs.searchAndBidToOngoingSubsale(Valuation2, tailBidID, {
+      from: buyerA,
+      value: 0.1e18
+    }) // Bid 5.
+
+    await cs.searchAndBidToOngoingSubsale(ValuationTooLow, tailBidID, {
+      from: buyerA,
+      value: 0.1e18
+    }) // Bid 6.
+
+    const bidsIDsOfBuyerA = await cs.getBidIdsForContributor(buyerA, true)
+
+    assert.equal(bidsIDsOfBuyerA.length, 5)
+    assert(bidsIDsOfBuyerA[0].eq(new BN('16e', 16)))
+    assert(bidsIDsOfBuyerA[1].eq(new BN('16f', 16)))
+    assert(bidsIDsOfBuyerA[2].eq(new BN('171', 16)))
+    assert(bidsIDsOfBuyerA[3].eq(new BN('172', 16)))
+    assert(bidsIDsOfBuyerA[4].eq(new BN('173', 16)))
+  })
+
   // after('revert evm to first snapshot', async function() {
   //   await pify(web3.currentProvider.send)({
   //     jsonrpc: '2.0',
