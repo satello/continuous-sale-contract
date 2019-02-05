@@ -381,6 +381,11 @@ contract ContinuousSale {
         currentCutOffBidMaxValuation = bids[currentCutOffBidID].maxValuation;
     }
 
+    /** @dev Get all bids of given contributor. This is required as contributorBidIDs getter retrieves one index per call.
+     *  @param _contributorAddress Address of the contributor to retrieve bids of.
+     *  @param _oldestFirst Flag to arrange the order either ascending or descending, in returned array.
+     *  @return _bidIds Array of bid ids belong to given contributor.
+     */ 
     function getBidIdsForContributor(address _contributorAddress, bool _oldestFirst) external view returns (uint[] memory _bidIds) {
       uint numberOfBids = contributorBidIDs[_contributorAddress].length;
       _bidIds = new uint[](numberOfBids);
